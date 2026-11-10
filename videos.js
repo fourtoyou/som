@@ -142,5 +142,140 @@ window.SOM_VIDEOS = [
   "h": 960,
   "dur": 22.2,
   "caption": "ถูตัวกับเสา ยิ้มพริ้ม"
+ },
+ {
+  "id": "v17",
+  "src": "videos/v17.mp4",
+  "poster": "videos/v17.jpg",
+  "w": 576,
+  "h": 1024,
+  "dur": 13.3,
+  "caption": "นอนหงายหลับสบายบนผ้าปูลายสวย"
+ },
+ {
+  "id": "v18",
+  "src": "videos/v18.mp4",
+  "poster": "videos/v18.jpg",
+  "w": 576,
+  "h": 1024,
+  "dur": 8.8,
+  "caption": "นั่งอยู่ข้างพัดลมสีเขียว"
+ },
+ {
+  "id": "v19",
+  "src": "videos/v19.mp4",
+  "poster": "videos/v19.jpg",
+  "w": 576,
+  "h": 1024,
+  "dur": 19.1,
+  "caption": "ก้มเล่นอยู่มุมห้องสีฟ้า"
+ },
+ {
+  "id": "v20",
+  "src": "videos/v20.mp4",
+  "poster": "videos/v20.jpg",
+  "w": 368,
+  "h": 640,
+  "dur": 22.8,
+  "caption": "นอนเอนข้างพัดลม มองไปรอบ ๆ"
+ },
+ {
+  "id": "v21",
+  "src": "videos/v21.mp4",
+  "poster": "videos/v21.jpg",
+  "w": 574,
+  "h": 1160,
+  "dur": 17.3,
+  "caption": "นอนยืดตัวยาว โชว์พุงนุ่ม ๆ"
+ },
+ {
+  "id": "v22",
+  "src": "videos/v22.mp4",
+  "poster": "videos/v22.jpg",
+  "w": 576,
+  "h": 1024,
+  "dur": 13.2,
+  "caption": "นอนพักบนเสื่อ ข้างพัดลมสีฟ้า"
+ },
+ {
+  "id": "v23",
+  "src": "videos/v23.mp4",
+  "poster": "videos/v23.jpg",
+  "w": 576,
+  "h": 1024,
+  "dur": 38.4,
+  "caption": "ก้มสำรวจมุมห้องสีเขียว"
+ },
+ {
+  "id": "v24",
+  "src": "videos/v24.mp4",
+  "poster": "videos/v24.jpg",
+  "w": 576,
+  "h": 1024,
+  "dur": 12.1,
+  "caption": "นอนสบาย ๆ หน้าพัดลม"
+ },
+ {
+  "id": "v25",
+  "src": "videos/v25.mp4",
+  "poster": "videos/v25.jpg",
+  "w": 576,
+  "h": 1024,
+  "dur": 14.1,
+  "caption": "นอนเล่นกลางห้อง ตาปรือ ๆ"
+ },
+ {
+  "id": "v26",
+  "src": "videos/v26.mp4",
+  "poster": "videos/v26.jpg",
+  "w": 576,
+  "h": 1024,
+  "dur": 17.2,
+  "caption": "เดินมาหา ดมกลิ่นเบา ๆ"
+ },
+ {
+  "id": "v27",
+  "src": "videos/v27.mp4",
+  "poster": "videos/v27.jpg",
+  "w": 576,
+  "h": 1024,
+  "dur": 16.6,
+  "caption": "โดนลูบด้วยปลายเท้า อุ่นสบาย"
+ },
+ {
+  "id": "v28",
+  "src": "videos/v28.mp4",
+  "poster": "videos/v28.jpg",
+  "w": 576,
+  "h": 1024,
+  "dur": 28.6,
+  "caption": "ถูตัวกับขาที่คุ้นเคย"
+ },
+ {
+  "id": "v29",
+  "src": "videos/v29.mp4",
+  "poster": "videos/v29.jpg",
+  "w": 720,
+  "h": 1280,
+  "dur": 61.2,
+  "caption": "เล่นเชือกอย่างสนุกสนาน"
+ },
+ {
+  "id": "v30",
+  "src": "videos/v30.mp4",
+  "poster": "videos/v30.jpg",
+  "w": 576,
+  "h": 1024,
+  "dur": 29.4,
+  "caption": "เดินเล่นบนผ้าปูแล้วโดนลูบ"
+ },
+ {
+  "id": "v31",
+  "src": "videos/v31.mp4",
+  "poster": "videos/v31.jpg",
+  "w": 576,
+  "h": 1024,
+  "dur": 19.3,
+  "caption": "นอนหงายผ่อนคลายข้างพัดลม"
  }
 ];
