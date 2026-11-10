@@ -60,6 +60,7 @@
 
   /* ---------- hearts ---------- */
   var heartFrac = 0;
+  var rubAcc = 0, rubAt = 0; // rub distance carries across short strokes (phones), reset after 1.5 s idle
   function showHearts() { $('heartN').textContent = state.hearts; }
   function giveHearts(n, x, y) {
     S.addHearts(state, n); showHearts(); dirty();
@@ -105,10 +106,11 @@
     if (now - pet.lastMove > 450) pet.rub0 = now;
     pet.lastMove = now;
     Cat.petting();
-    pet.acc += d;
+    if (now - rubAt > 1500) rubAcc = 0;
+    rubAt = now; rubAcc += d;
     if (zone === 'belly') { if (!pet.belly0) pet.belly0 = now; if (!pet.hugged && now - pet.belly0 > 1500) { pet.hugged = true; Cat.react({ hug: 1 }, 1.8); say('จับได้แล้ว!'); A.pop(); } }
-    if (pet.acc >= 70 && now - pet.lastHeart > 200) {
-      pet.acc = 0; pet.lastHeart = now;
+    if (rubAcc >= 45 && now - pet.lastHeart > 200) {
+      rubAcc = 0; pet.lastHeart = now;
       heartFrac += zone === 'chin' ? 1.5 : 1;
       var n = Math.floor(heartFrac); heartFrac -= n;
       state.petsTotal++; giveHearts(n, v.x, v.y - 4); A.pop();

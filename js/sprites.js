@@ -1,19 +1,22 @@
-/* sprites.js - ส้ม drawn in code. Indexed pixel buffers, integer rasterizer, rim light/shade, auto 1px outline. */
+/* sprites.js - ส้ม drawn in code, chibi look ported from dev/concept/cute.py. Indexed pixel buffers, 1px auto outline. */
 (function (root) {
   'use strict';
 
   var PAL = [null,
-    '#5B3420', '#C9772F', '#E9A35A', '#F6C88A', '#FFF6E8', '#E3D2BE', '#EE9C9C', '#CFE08E', '#2F3A22', '#6B3B2A',
-    '#F8DCD2', '#E8BDB4', null, null, null, null, null, null, null,
+    '#603824', '#D47C38', '#F0A358', '#FACC92', '#FFF9EE', '#ECDCC8', '#F4969E', '#ACD470', '#302822', '#7A4A34',
+    '#FFF1E6', '#F0D6C8', '#FAACA4', '#FFFFFF', null, null, null, null, null,
     '#F2C14E', '#C98F1E', '#FFE69A', '#D8324B', '#2FAE6A', '#3C63C8', '#E03B4F', '#A82237', '#FF8A1F', '#FFC060',
     '#D9444F', '#FFFFFF', '#2FA39E', '#1F7C78', '#1E242B', '#3A4656', '#FFFFFF', '#C9955A', '#A4733F', '#DDB27A', '#EAD0A0'];
-  var OUT = 1, STR = 2, FUR = 3, FURL = 4, WHT = 5, WSH = 6, PNK = 7, EYE = 8, PUP = 9, FRK = 10, BEL = 11;
+  var OUT = 1, STR = 2, FUR = 3, FURL = 4, WHT = 5, WSH = 6, PNK = 7, GRN = 8, EYE = 9, FRK = 10, BEL = 11, BEL2 = 12, BLU = 13, HI = 14;
 
-  /* ---------- Buf ---------- */
-  function Buf(w, h) { this.w = w; this.h = h; this.d = new Uint8Array(w * h); }
-  Buf.prototype.g = function (x, y) { return (x < 0 || y < 0 || x >= this.w || y >= this.h) ? 0 : this.d[y * this.w + x]; };
+  /* ---------- Buf (tx/ty = drawing origin shift; blit/finish ignore it) ---------- */
+  function Buf(w, h) { this.w = w; this.h = h; this.d = new Uint8Array(w * h); this.tx = 0; this.ty = 0; }
+  Buf.prototype.g = function (x, y) {
+    x = Math.round(x) + this.tx; y = Math.round(y) + this.ty;
+    return (x < 0 || y < 0 || x >= this.w || y >= this.h) ? 0 : this.d[y * this.w + x];
+  };
   Buf.prototype.s = function (x, y, c, over) {
-    x = Math.round(x); y = Math.round(y);
+    x = Math.round(x) + this.tx; y = Math.round(y) + this.ty;
     if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
     var i = y * this.w + x;
     if (over && over.indexOf(this.d[i]) < 0) return;
@@ -65,32 +68,35 @@
       if (v) this.s(x + i, y + j, v, over);
     }
   };
+  // raw copy of a finished layer (no origin shift), optional vertical flip
   Buf.prototype.blit = function (src, x, y, flipV) {
     for (var j = 0; j < src.h; j++) for (var i = 0; i < src.w; i++) {
       var v = src.d[(flipV ? src.h - 1 - j : j) * src.w + i];
-      if (v) this.s(x + i, y + j, v);
+      if (!v) continue;
+      var X = x + i, Y = y + j;
+      if (X >= 0 && Y >= 0 && X < this.w && Y < this.h) this.d[Y * this.w + X] = v;
     }
   };
-
-  // soft diagonal bands of stripe colour on fur pixels inside a rect
-  function bands(b, x0, y0, x1, y1, per, thick, dir) {
+  // super-ellipse with pixel-centre test: same maths as concept/cute.py ell()
+  Buf.prototype.sq = function (cx, cy, rx, ry, c, p, over) {
+    p = p || 2;
+    var x0 = Math.floor(cx - rx) - 1, x1 = Math.ceil(cx + rx) + 1, y0 = Math.floor(cy - ry) - 1, y1 = Math.ceil(cy + ry) + 1;
     for (var y = y0; y <= y1; y++) for (var x = x0; x <= x1; x++) {
-      if (b.g(x, y) !== FUR) continue;
-      var k = dir > 0 ? x + y : x - y;
-      if (((k % per) + per) % per < thick) b.s(x, y, STR);
+      if (Math.pow(Math.abs((x + 0.5 - cx) / rx), p) + Math.pow(Math.abs((y + 0.5 - cy) / ry), p) <= 1) this.s(x, y, c, over);
     }
-  }
-  // rim light (top-left) / shade (bottom-right) on exterior edges only
-  function rim(b) {
-    var o = b.d.slice(), w = b.w, h = b.h;
-    function og(x, y) { return (x < 0 || y < 0 || x >= w || y >= h) ? 0 : o[y * w + x]; }
-    for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
-      var c = o[y * w + x]; if (c !== FUR && c !== WHT && c !== BEL) continue;
-      if (!og(x, y + 1) || !og(x + 1, y)) b.d[y * w + x] = c === FUR ? STR : (c === WHT ? WSH : 12);
-      else if (c === FUR && (!og(x - 1, y) || !og(x, y - 1))) b.d[y * w + x] = FURL;
+  };
+  Buf.prototype.tri = function (pts, c, over) {
+    var x1 = pts[0][0], y1 = pts[0][1], x2 = pts[1][0], y2 = pts[1][1], x3 = pts[2][0], y3 = pts[2][1];
+    function sg(px, py, ax, ay, bx, by) { return (px - bx) * (ay - by) - (ax - bx) * (py - by); }
+    var X0 = Math.floor(Math.min(x1, x2, x3)) - 1, X1 = Math.ceil(Math.max(x1, x2, x3)) + 1, Y0 = Math.floor(Math.min(y1, y2, y3)) - 1, Y1 = Math.ceil(Math.max(y1, y2, y3)) + 1;
+    for (var y = Y0; y <= Y1; y++) for (var x = X0; x <= X1; x++) {
+      var px = x + 0.5, py = y + 0.5, a = sg(px, py, x1, y1, x2, y2), b = sg(px, py, x2, y2, x3, y3), d = sg(px, py, x3, y3, x1, y1);
+      if (!(Math.min(a, b, d) < 0 && Math.max(a, b, d) > 0)) this.s(x, y, c, over);
     }
-  }
-  // 1px outline: every empty pixel 4-adjacent to a filled non-outline pixel. Result is padded by 1 (blit at -1,-1).
+  };
+  Buf.prototype.pts = function (c, list, over) { for (var i = 0; i < list.length; i++) this.s(list[i][0], list[i][1], c, over); };
+
+  // 1px outline: every empty pixel 4-adjacent to a filled non-outline pixel. Result is padded by 1.
   function finish(b) {
     var w = b.w + 2, h = b.h + 2, r = new Buf(w, h), x, y;
     for (y = 0; y < b.h; y++) for (x = 0; x < b.w; x++) r.d[(y + 1) * w + x + 1] = b.d[y * b.w + x];
@@ -103,107 +109,80 @@
     }
     return r;
   }
-  // full-size finished layer: draw with fn, rim, outline. blit result at (-1,-1)
-  function L(W, H, fn) { var b = new Buf(W, H); fn(b); rim(b); return finish(b); }
-  function mirrorPts(p, W) { return p.map(function (q) { return [W - q[0], q[1]]; }); }
 
-  function tailDraw(b, pts, r, ring) {
-    var p = b.thick(pts, r, FUR);
-    if (ring !== false) for (var i = 2; i < p.length - 2; i++) if (Math.floor(i / 3) % 2 === 1) b.ell(p[i][0], p[i][1], r, r, STR, [FUR]);
-    return p;
-  }
-
-  /* ---------- heads ---------- */
-  var EY = {
-    half: { y: 7, r: ['11111', '88988', '.898.'] },
-    happy: { y: 8, r: ['.111.', '1...1'] },
-    sleep: { y: 8, r: ['1...1', '.111.'] },
-    blink: { y: 8, r: ['.....', '11111'] },
-    open: { y: 6, r: ['.111.', '88988', '88988', '.888.'] }
-  };
-  EY.meow = EY.half;
-  var EYS = {
-    half: { y: 7, r: ['1111', '8898'] }, happy: { y: 7, r: ['.11.', '1..1'] }, sleep: { y: 7, r: ['1..1', '.11.'] },
-    blink: { y: 7, r: ['....', '1111'] }, open: { y: 6, r: ['.11.', '8998', '8998', '.88.'] }
-  };
-  EYS.meow = EYS.half;
-
-  var HX = 4, HY = 10, HW = 35, HH = 30; // head composite buffer; head origin inside it. Front head is 27x18.
-
-  // raw (un-outlined) front head, centre column 13
-  function headRaw(o) {
-    var b = new Buf(27, 18), expr = o.expr || 'half', M = 26;
-    var Lr = o.ear ? [[3, 9], [3, 5], [4, 3], [5, 2], [7, 2], [10, 5], [10, 8]] : [[3, 8], [3, 3], [4, 1], [5, 0], [7, 0], [10, 3], [10, 8]];
-    b.poly(Lr, FUR); b.poly(mirrorPts(Lr, M), FUR);
-    b.ell(13, 9.5, 13, 7, FUR); b.ell(13, 12, 12, 5.5, FUR); // broad skull + full jowls
-    var P0 = [[4, 6], [4, 3], [5, 2], [6, 2], [8, 4], [8, 6]], P1 = o.ear ? [[4, 7], [4, 4], [5, 3], [6, 3], [8, 5], [8, 7]] : P0;
-    b.poly(P1, PNK, [FUR]); b.poly(mirrorPts(P0, M), PNK, [FUR]);
-    b.poly([[12, 4], [14, 4], [15, 7], [17, 10], [9, 10], [11, 7]], WHT, [FUR]);
-    b.ell(13, 13, 7, 4, WHT, [FUR]); b.ell(13, 15, 6, 2.5, WHT, [FUR]);
-    [[13, 2], [13, 3], [10, 3], [10, 4], [10, 5], [16, 3], [16, 4], [16, 5], [7, 4], [7, 5], [19, 4], [19, 5],
-      [1, 10], [2, 10], [3, 10], [1, 12], [2, 12], [23, 10], [24, 10], [25, 10], [24, 12], [25, 12]].forEach(function (p) { b.s(p[0], p[1], STR, [FUR]); });
-    var e = EY[expr] || EY.half;
-    b.stamp(e.r, 6, e.y); b.stamp(e.r, 16, e.y);
-    b.s(12, 11, PNK); b.s(13, 11, PNK); b.s(14, 11, PNK); b.s(13, 12, PNK); b.s(15, 12, FRK); // freckle on viewer's right
-    if (expr === 'meow' || o.mo) b.stamp(['111', '171', '.1.'], 12, 13);
-    else if (expr === 'happy') {
-      [[11, 13], [12, 14], [13, 14], [14, 14], [15, 13]].forEach(function (p) { b.s(p[0], p[1], OUT); });
-      [[4, 12], [5, 12], [21, 12], [22, 12]].forEach(function (p) { b.s(p[0], p[1], PNK); });
-    } else { b.s(13, 13, OUT); b.s(12, 14, OUT); b.s(14, 14, OUT); }
-    return b;
-  }
-  function headFront(o) {
-    var b = headRaw(o); rim(b);
-    var out = new Buf(HW, HH); out.blit(finish(b), HX - 1, HY - 1);
-    accHead(out, o.acc || {}, 'front');
-    return out;
-  }
-  // head merged into a body buffer with no outline seam; a soft shade under the chin keeps the jaw readable
-  function mergeHead(body, o, hox, hoy) {
-    var hr = headRaw(o), x, y;
-    body.blit(hr, hox, hoy);
-    for (y = 0; y < hr.h; y++) for (x = 0; x < hr.w; x++) {
-      if (!hr.d[y * hr.w + x]) continue;
-      if (hr.g(x, y + 1)) continue;
-      var c = body.g(hox + x, hoy + y + 1);
-      if (c === FUR || c === FURL) body.s(hox + x, hoy + y + 1, STR); else if (c === WHT) body.s(hox + x, hoy + y + 1, WSH);
+  // soft diagonal bands of stripe colour on fur pixels inside a rect
+  function bands(b, x0, y0, x1, y1, per, thick, dir) {
+    for (var y = y0; y <= y1; y++) for (var x = x0; x <= x1; x++) {
+      if (b.g(x, y) !== FUR) continue;
+      var k = dir > 0 ? x + y : x - y;
+      if (((k % per) + per) % per < thick) b.s(x, y, STR);
     }
   }
-  function drawAccFront(out, acc, hox, hoy) {
-    var t = new Buf(HW, HH); accHead(t, acc || {}, 'front'); out.blit(t, hox - HX, hoy - HY);
+  function limb(b, x1, y1, x2, y2, r, c) {
+    var n = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1), 1) * 2;
+    for (var i = 0; i <= n; i++) b.sq(x1 + (x2 - x1) * i / n, y1 + (y2 - y1) * i / n, r, r, c, 2);
   }
+  // thin tail, 6 samples per segment, 2 darker rings (as in cute.py)
+  function tailDraw(b, path, r) {
+    var pts = [], n, i, k;
+    for (i = 0; i < path.length - 1; i++) for (k = 0; k < 6; k++) pts.push([path[i][0] + (path[i + 1][0] - path[i][0]) * k / 6, path[i][1] + (path[i + 1][1] - path[i][1]) * k / 6]);
+    n = pts.length; var r1 = Math.round(n * 0.4), r2 = Math.round(n * 0.667);
+    for (i = 0; i < n; i++) b.sq(pts[i][0], pts[i][1], r, r, (i === r1 || i === r1 + 1 || i === r2 || i === r2 + 1) ? STR : FUR, 2);
+  }
+  function mitten(b, x, y, rx, ry, far) { b.sq(x, y, rx, ry, far ? WSH : WHT, 2); }
 
-  function headSide(o) {
-    var b = new Buf(21, 17), expr = o.expr || 'half';
-    b.poly([[12, 6], [13, 1], [14, 0], [15, 0], [18, 5], [18, 7]], FUR);
-    b.poly([[2, 7], [3, 1], [4, 0], [5, 0], [10, 4], [10, 7]], FUR);
-    b.ell(9, 9.5, 9, 7, FUR);
-    b.poly([[4, 6], [4, 3], [5, 2], [6, 3], [8, 5], [8, 6]], PNK, [FUR]);
-    b.poly([[14, 5], [14, 2], [15, 2], [16, 5]], PNK, [FUR]);
-    b.ell(15, 11.5, 5, 4, WHT, [FUR]); b.ell(12, 14, 5, 2.5, WHT, [FUR]);
-    [[6, 3], [6, 4], [8, 3], [8, 4], [8, 5], [10, 4], [10, 5], [2, 10], [3, 10], [4, 10], [2, 12], [3, 12]].forEach(function (p) { b.s(p[0], p[1], STR, [FUR]); });
-    rim(b);
-    var e = EYS[expr] || EYS.half;
-    b.stamp(e.r, 10, e.y);
-    b.s(19, 9, PNK); b.s(20, 9, PNK); b.s(20, 10, PNK); b.s(18, 10, FRK);
-    if (expr === 'meow' || o.mo) b.stamp(['1111', '1771', '.11.'], 17, 12 - (o.mo === 2 ? 0 : 0));
-    else if (expr === 'happy') { b.s(16, 12, OUT); b.s(17, 13, OUT); b.s(18, 13, OUT); b.s(19, 12, OUT); }
-    else { b.s(17, 12, OUT); b.s(18, 12, OUT); b.s(19, 12, OUT); }
-    var out = new Buf(HW - 6, HH); out.blit(finish(b), HX - 1, HY - 1);
-    accHead(out, o.acc || {}, 'side');
-    return out;
+  /* ---------- head (cute.py coordinates; head origin ox,oy shifts everything) ---------- */
+  function headBase(b, ox, oy, o) {
+    function T(p) { return p.map(function (q) { return [q[0] + ox, q[1] + oy]; }); }
+    var fl = !!o.ear;
+    b.tri(T(fl ? [[11, 3], [7, 12], [17, 6]] : [[10, 1], [7, 12], [17, 6]]), FUR);
+    b.tri(T([[34, 1], [37, 12], [27, 6]]), FUR);
+    b.sq(ox + 22, oy + 15.5, 15, 11.5, FUR, 2.4);
+    b.tri(T(fl ? [[11.2, 5.4], [9, 9.5], [14.2, 6.6]] : [[10.6, 3.6], [9, 9.5], [14.2, 6.6]]), PNK);
+    b.tri(T([[33.4, 3.6], [35, 9.5], [29.8, 6.6]]), PNK);
+    b.sq(ox + 22, oy + 21, 7.8, 5.2, WHT, 2.2, [FUR]);
+    b.tri(T([[22, 9.5], [20, 17.5], [24, 17.5]]), WHT, [FUR]);
+    b.pts(STR, T([[22, 5], [22, 6], [22, 7], [19, 6], [19, 7], [25, 6], [25, 7]]));
+    b.pts(STR, T([[8, 17], [9, 17], [8, 19], [9, 19], [35, 17], [36, 17], [35, 19], [36, 19]]));
+    if (!fl) b.pts(FURL, T([[14, 6], [15, 6], [16, 5], [17, 5]]));
+    else b.pts(FURL, T([[14, 6], [15, 6], [16, 5], [17, 5]]));
+  }
+  function expOf(o) {
+    var e = o.expr || 'open', mo = !!o.mo, eyes = e;
+    if (e === 'half') eyes = 'open';
+    if (e === 'slow') eyes = 'drowsy';
+    if (e === 'meow') { eyes = o.pose === 'stretch' ? 'happy' : 'open'; mo = true; }
+    return { eyes: eyes, mo: mo };
+  }
+  function faceDraw(b, ox, oy, o) {
+    var x = expOf(o), E = EYE, ex, i, P = function (c, list) { b.pts(c, list.map(function (q) { return [q[0] + ox, q[1] + oy]; })); };
+    P(WSH, [[21, 26], [22, 26], [23, 26]]);
+    [13, 28].forEach(function (ex) {
+      if (x.eyes === 'open') {
+        P(E, [[ex, 14], [ex + 1, 14], [ex - 1, 15], [ex + 2, 15], [ex - 1, 16], [ex + 2, 16], [ex - 1, 17], [ex + 2, 17], [ex, 18], [ex + 1, 18]]);
+        P(GRN, [[ex + 1, 15], [ex, 16], [ex, 17]]); P(E, [[ex + 1, 16], [ex + 1, 17]]); P(HI, [[ex, 15]]);
+      } else if (x.eyes === 'drowsy') {
+        P(E, [[ex - 1, 16], [ex, 16], [ex + 1, 16], [ex + 2, 16], [ex - 1, 17], [ex + 2, 17], [ex, 18], [ex + 1, 18]]); P(GRN, [[ex, 17], [ex + 1, 17]]);
+      } else if (x.eyes === 'happy') P(E, [[ex - 1, 17], [ex, 16], [ex + 1, 16], [ex + 2, 17]]);
+      else if (x.eyes === 'sleep') P(E, [[ex - 1, 16], [ex, 17], [ex + 1, 17], [ex + 2, 16]]);
+      else P(E, [[ex - 1, 17], [ex, 17], [ex + 1, 17], [ex + 2, 17]]); // blink
+    });
+    P(PNK, [[21, 19], [22, 19]]); P(FRK, [[23, 19]]);
+    if (x.mo) { P(OUT, [[21, 20], [22, 20], [23, 20], [21, 21], [23, 21], [22, 22]]); P(PNK, [[22, 21]]); }
+    else P(OUT, [[22, 20], [20, 21], [21, 21], [23, 21], [24, 21]]);
+    P(BLU, [[12, 20], [13, 20], [31, 20], [32, 20]]);
   }
 
   /* ---------- accessories ---------- */
   var ACC = {};
   ACC.crown = function () {
-    var b = new Buf(15, 10);
-    b.poly([[0, 9], [0, 1], [3, 5], [5, 2], [7, 0], [9, 2], [11, 5], [14, 1], [14, 9]], 20);
-    b.rect(0, 5, 15, 5, 20); b.rect(0, 9, 15, 1, 21); b.rect(0, 5, 15, 1, 22);
-    b.s(0, 1, 22); b.s(7, 0, 22); b.s(14, 1, 22); b.s(5, 2, 22); b.s(9, 2, 22);
-    b.rect(6, 6, 3, 3, 24); b.s(6, 6, 22);
-    b.rect(2, 6, 2, 2, 23); b.rect(11, 6, 2, 2, 23); b.s(4, 7, 25); b.s(10, 7, 25);
-    b.s(1, 8, 21); b.s(13, 8, 21);
+    var b = new Buf(16, 10);
+    b.poly([[0, 9], [0, 1], [3, 5], [5, 2], [7, 0], [8, 0], [10, 2], [12, 5], [15, 1], [15, 9]], 20);
+    b.rect(0, 5, 16, 5, 20); b.rect(0, 9, 16, 1, 21); b.rect(0, 5, 16, 1, 22);
+    b.s(0, 1, 22); b.s(7, 0, 22); b.s(8, 0, 22); b.s(15, 1, 22); b.s(5, 2, 22); b.s(10, 2, 22);
+    b.rect(6, 6, 4, 3, 24); b.s(6, 6, 22);
+    b.rect(2, 6, 2, 2, 23); b.rect(12, 6, 2, 2, 23); b.s(4, 7, 25); b.s(11, 7, 25);
+    b.s(1, 8, 21); b.s(14, 8, 21);
     return finish(b);
   };
   function drawSticker(b, x, y) {
@@ -211,199 +190,182 @@
     [[1, 0], [2, 0], [3, 0], [4, 0], [1, 5], [2, 5], [3, 5], [4, 5], [0, 1], [0, 2], [0, 3], [0, 4], [5, 1], [5, 2], [5, 3], [5, 4]]
       .forEach(function (p) { b.s(x + p[0], y + p[1], 2); });
   }
-  function accHead(out, acc, kind) {
-    var front = kind === 'front';
-    if (acc.head === 'sticker') drawSticker(out, HX + (front ? 10 : 5), HY + 1);
-    if (acc.head === 'crown') out.blit(ACC.crown(), HX + (front ? 13 : 9) - 7 - 1, HY - 5 - 1);
+  // out has its origin shift set; (ox,oy) = head origin in that frame
+  function accHead(out, acc, ox, oy) {
+    if (!acc) return;
+    if (acc.head === 'sticker') drawSticker(out, ox + 19, oy + 8);
+    if (acc.head === 'crown') out.blit(ACC.crown(), ox + 14 + out.tx - 1, oy - 2 + out.ty - 1);
   }
 
+  /* ---------- pose canvas: layers share one frame; out.tx/ty map frame coords onto the padded output ---------- */
+  function Pose(W, H, tx, ty) { this.W = W; this.H = H; this.tx = tx; this.ty = ty; this.out = new Buf(W + 2, H + 2); this.out.tx = tx + 1; this.out.ty = ty + 1; }
+  Pose.prototype.layer = function (fn) {
+    var b = new Buf(this.W, this.H); b.tx = this.tx; b.ty = this.ty; fn(b); this.out.blit(finish(b), 0, 0); return this;
+  };
+  Pose.prototype.head = function (ox, oy, o) { // separate outlined head + face + accessory
+    var self = this;
+    this.layer(function (b) { headBase(b, ox, oy, o); });
+    faceDraw(this.out, ox, oy, o); accHead(this.out, o.acc, ox, oy);
+    return this;
+  };
+  Pose.prototype.res = function (ax, G, hx, hy, extra) {
+    var r = { buf: this.out, ax: ax + this.tx + 1, ay: G + this.ty + 2, head: { x: hx + 7 + this.tx + 1, y: hy + 4 + this.ty + 1, w: 30, h: 23 } };
+    for (var k in extra) r[k] = extra[k];
+    return r;
+  };
+
   /* ---------- poses ---------- */
-  function res(buf, ax, gy, head, extra) { var r = { buf: buf, ax: ax, ay: gy + 1, head: head }; for (var k in extra) r[k] = extra[k]; return r; }
-
-  function pawLayer(W, H, x, y, rx, ry, c) { return L(W, H, function (b) { b.ell(x, y, rx, ry, c || WHT); b.s(Math.round(x), Math.round(y + ry), WSH); }); }
-
   function poseSit(o) {
-    var W = 62, H = 64, C = 31, G = 58, br = o.br ? 1 : 0, tw = o.tw || 0, paw = o.paw || '';
-    var back = new Buf(W, H);
-    back.blit(L(W, H, function (b) { tailDraw(b, [[C + 17, G - 4], [C + 22, G - 6], [C + 25, G - 12], [C + 25, G - 19], [C + 23 + tw, G - 24 - (tw ? 1 : 0)]], 2.2); }), -1, -1);
-    var body = new Buf(W, H);
-    body.ell(C, G - 11, 17, 11, FUR); body.ell(C, G - 21 - br, 13, 10, FUR); // soft pear: round base, rounded torso
-    body.rect(C - 10, G - 18, 7, 14, FUR); body.rect(C + 4, G - 18, 7, 14, FUR);
-    body.poly([[C - 5, G - 30 - br], [C + 5, G - 30 - br], [C + 6, G - 22], [C + 3, G - 12], [C - 3, G - 12], [C - 6, G - 22]], WHT, [FUR]);
-    body.ell(C - 17, G - 1, 3.5, 1.5, WHT, [FUR]); body.ell(C + 17, G - 1, 3.5, 1.5, WHT, [FUR]);
-    bands(body, C - 17, G - 14, C - 9, G, 8, 2, 1); bands(body, C + 9, G - 14, C + 17, G, 8, 2, -1);
-    [[-11, -26], [-11, -23], [-10, -20], [-9, -17]].forEach(function (p) { body.s(C + p[0], G + p[1], STR, [FUR]); body.s(C + p[0] + 1, G + p[1], STR, [FUR]); body.s(C - p[0], G + p[1], STR, [FUR]); body.s(C - p[0] - 1, G + p[1], STR, [FUR]); });
-    var hox = C - 13, hoy = G - 47 - br;
-    mergeHead(body, o, hox, hoy);
-    rim(body);
-    var out = new Buf(W, H); out.blit(back, 0, 0); out.blit(finish(body), -1, -1);
-    var raiseL = paw.indexOf('bat') === 0, raiseR = paw.indexOf('groom') === 0;
-    if (!raiseL) out.blit(pawLayer(W, H, C - 6.5, G - 3, 3.5, 3), -1, -1);
-    if (!raiseR) out.blit(pawLayer(W, H, C + 6.5, G - 3, 3.5, 3), -1, -1);
-    drawAccFront(out, o.acc, hox, hoy);
-    if (raiseL) { var up = paw === 'bat1' ? 5 : 0; out.blit(L(W, H, function (b) { b.thick([[C - 8, G - 18], [C - 14, G - 22 - up]], 2.4, FUR); b.ell(C - 16, G - 24 - up, 3, 3, WHT); b.s(C - 16, G - 22 - up, WSH); }), -1, -1); }
-    if (raiseR) { var g1 = paw === 'groom1' ? 1 : 0; out.blit(L(W, H, function (b) { b.thick([[C + 8, G - 17], [C + 3, G - 26 - g1]], 2.4, FUR); b.ell(C + 2, G - 28 - g1, 3, 3, WHT); b.s(C + 2, G - 26 - g1, WSH); }), -1, -1); }
-    return res(out, C, G, { x: hox, y: hoy, w: 27, h: 18 });
+    var br = o.br ? 1 : 0, tw = o.tw ? 1 : 0, paw = o.paw || '', P = new Pose(60, 54, 7, 7);
+    var raiseL = paw.indexOf('bat') === 0, raiseR = paw.indexOf('groom') === 0, f = /1$/.test(paw) ? 1 : 0;
+    P.layer(function (b) {
+      tailDraw(b, [[30, 39.2], [33.5, 39.8], [37, 39.6], [39.6, 38.2], [40.8 + tw * 0.8, 35.8 - tw], [40.2 + tw * 1.2, 33.6 - tw * 1.4]], 1.8);
+      b.sq(22, 32, 12.5, 9.5, FUR, 2.2);
+      b.sq(22, 30, 6.5, 7.5, WHT, 2, [FUR]);
+      if (!raiseL) b.sq(17.5, 40, 3.4, 2.4, WHT);
+      if (!raiseR) b.sq(26.5, 40, 3.4, 2.4, WHT);
+      headBase(b, 0, -br, o);
+      b.pts(STR, [[10, 31], [11, 31], [12, 32], [10, 35], [11, 35], [33, 31], [34, 31], [32, 32], [33, 35], [34, 35]]);
+    });
+    faceDraw(P.out, 0, -br, o); accHead(P.out, o.acc, 0, -br);
+    if (raiseL) P.layer(function (b) { var up = f ? 4 : 0; limb(b, 14, 31, 9, 24 - up, 2.2, FUR); mitten(b, 8, 22 - up, 3.3, 3, false); b.s(8, 25 - up, WSH); });
+    if (raiseR) P.layer(function (b) { limb(b, 31, 32, 29.5, 27 - f, 2.2, FUR); mitten(b, 28, 24.5 - f, 3.4, 2.9, false); b.s(28, 27 - f, WSH); });
+    return P.res(22, 41, 0, -br);
   }
 
   function poseLoaf(o) {
-    var W = 62, H = 56, C = 31, G = 50, br = o.br ? 1 : 0, tw = o.tw || 0;
-    var body = new Buf(W, H);
-    body.ell(C, G - 9, 20, 9, FUR); body.ell(C, G - 13 - br, 16, 9, FUR);
-    body.ell(C, G - 13, 6, 6, WHT, [FUR]);
-    bands(body, C - 19, G - 16, C - 7, G, 8, 2, 1); bands(body, C + 7, G - 16, C + 19, G, 8, 2, -1);
-    var hox = C - 13, hoy = G - 35 - br;
-    mergeHead(body, o, hox, hoy);
-    rim(body);
-    var out = new Buf(W, H); out.blit(finish(body), -1, -1);
-    out.blit(L(W, H, function (b) { tailDraw(b, [[C + 15, G - 1], [C + 20, G - 1], [C + 23, G - 5], [C + 22 + tw, G - 9]], 1.9); }), -1, -1);
-    out.blit(L(W, H, function (b) { b.ell(C - 5, G - 2, 3.5, 2, WHT); b.ell(C + 5, G - 2, 3.5, 2, WHT); b.s(C - 5, G - 1, WSH); b.s(C + 5, G - 1, WSH); }), -1, -1);
-    drawAccFront(out, o.acc, hox, hoy);
-    return res(out, C, G, { x: hox, y: hoy, w: 27, h: 18 });
+    var br = o.br ? 1 : 0, tw = o.tw ? 1 : 0, P = new Pose(60, 50, 7, 5);
+    P.layer(function (b) {
+      tailDraw(b, [[36, 40], [40.5, 39.5], [43, 36.5], [42.5 + tw, 33 - tw]], 1.7);
+      b.sq(22, 33, 17.5, 8.2, FUR, 2.4);
+      b.sq(22, 34.5, 5.5, 5, WHT, 2, [FUR]);
+      b.sq(15.5, 40.5, 3.2, 1.8, WHT); b.sq(28.5, 40.5, 3.2, 1.8, WHT);
+      headBase(b, 0, 3 - br, o);
+      b.pts(STR, [[8, 36], [9, 36], [10, 37], [35, 36], [36, 36], [34, 37], [6, 33], [7, 33], [37, 33], [38, 33]]);
+    });
+    faceDraw(P.out, 0, 3 - br, o); accHead(P.out, o.acc, 0, 3 - br);
+    return P.res(22, 41, 0, 3 - br);
   }
 
   function poseLie(o) {
-    var W = 70, H = 50, X = 8, G = 44, br = o.br ? 0.6 : 0, tw = o.tw || 0, pt = o.pt || 0;
-    var back = new Buf(W, H);
-    back.blit(L(W, H, function (b) { tailDraw(b, [[X + 3, G - 8], [X - 2, G - 6], [X - 6, G - 2 + (tw ? 1 : 0)], [X - 7 + tw, G + 0]], 2); }), -1, -1);
-    var body = new Buf(W, H);
-    body.ell(X + 9, G - 9, 8, 8, FUR); body.ell(X + 17, G - 11 - br / 2, 15, 9 + br / 2, FUR);
-    body.ell(X + 19, G - 4, 12, 3, WHT, [FUR]); body.ell(X + 27, G - 11, 5, 6, WHT, [FUR]);
-    bands(body, X + 1, G - 20, X + 24, G - 4, 6, 2, 1);
-    body.ell(X + 5, G - 1, 3.5, 1.5, WHT, [FUR]);
-    rim(body);
-    var out = new Buf(W, H); out.blit(back, 0, 0); out.blit(finish(body), -1, -1);
-    // forelegs stretched forward, white mittens
-    out.blit(L(W, H, function (b) { b.thick([[X + 22, G - 11], [X + 42, G - 9 + pt]], 2, FUR); b.ell(X + 44, G - 9 + pt, 3.2, 2.5, WHT); b.s(X + 45, G - 8 + pt, WSH); }), -1, -1);
-    out.blit(L(W, H, function (b) { b.thick([[X + 22, G - 6], [X + 40, G - 3]], 2.2, FUR); b.ell(X + 43, G - 3, 3.6, 2.6, WHT); b.s(X + 44, G - 2, WSH); }), -1, -1);
-    var hox = X + 24, hoy = G - 29 - Math.round(br);
-    out.blit(headFront(o), hox - HX, hoy - HY);
-    return res(out, X + 24, G, { x: hox, y: hoy, w: 27, h: 18 });
+    var br = o.br ? 0.6 : 0, tw = o.tw ? 1 : 0, pt = o.pt ? 1 : 0, P = new Pose(72, 46, 9, 4), ry = 8.7 + br, G = 38, hx = 17, hy = 6;
+    P.layer(function (b) { tailDraw(b, [[5, 34.5], [0.5, 36.5], [-3.5, 36.8], [-7, 35 - tw * 1.5]], 1.7); });
+    P.layer(function (b) {
+      b.sq(18, G - ry + 0.5, 17, ry, FUR, 2.2);
+      b.sq(20, G - 2, 12.5, 2.6, WHT, 2, [FUR]);
+      b.sq(5.5, G - 1.2, 3.6, 1.9, WHT);
+      bands(b, 3, G - 19, 24, G - 8, 8, 2, 1);
+    });
+    P.head(hx, hy, o);
+    P.layer(function (b) { mitten(b, 36, G - 1.8, 4, 2.6, false); });
+    P.layer(function (b) { mitten(b, 46 + pt, G - 1.8 - pt, 4, 2.6, false); });
+    return P.res(26, G, hx, hy);
   }
 
   function poseBellyUp(o) {
-    var W = 56, H = 62, C = 28, br = o.br ? 1 : 0, wg = o.wg || 0, hug = o.hug;
-    var G = 52;
-    var back = new Buf(W, H);
-    back.blit(L(W, H, function (b) { tailDraw(b, [[C - 2, G - 6], [C - 1, G - 1], [C + 2 + wg, G + 3]], 2); }), -1, -1);
-    var body = new Buf(W, H);
-    body.ell(C, G - 17, 17, 14, FUR);
-    body.ell(C, G - 17, 10, 9 + br * 0.5, BEL);
-    body.s(C - 1, G - 14, 12); body.s(C + 2, G - 11, 12);
-    bands(body, C - 17, G - 24, C - 11, G - 8, 5, 2, 1); bands(body, C + 11, G - 24, C + 17, G - 8, 5, 2, -1);
-    rim(body);
-    var out = new Buf(W, H); out.blit(back, 0, 0); out.blit(finish(body), -1, -1);
-    function leg(ax, ay, bx, by, px, py) { out.blit(L(W, H, function (b) { b.thick([[ax, ay], [bx, by]], 2.6, FUR); b.ell(px, py, 3.4, 3.4, WHT); b.s(px, py + 1, WSH); }), -1, -1); }
-    var w1 = wg ? 1 : -1;
+    var br = o.br ? 1 : 0, wg = o.wg ? 1 : 0, hug = !!o.hug, P = new Pose(56, 60, 6, 4), G = 49, hx = 0, hy = 1;
+    P.layer(function (b) { tailDraw(b, [[33, 45], [38, 47.5], [42, 46], [44 + wg, 42.5 - wg]], 1.7); });
+    P.layer(function (b) {
+      b.sq(22, 36, 15.5, 12.5 + br * 0.4, FUR, 2.2);
+      b.sq(22, 37, 10.5, 9 + br * 0.4, BEL, 2.1);
+      b.pts(BEL2, [[20, 40], [21, 40], [24, 43]]);
+      b.pts(STR, [[8, 36], [9, 36], [8, 38], [36, 36], [35, 36], [36, 38]]);
+    });
+    function leg(ax, ay, bx, by, px, py) { P.layer(function (b) { limb(b, ax, ay, bx, by, 2.4, FUR); mitten(b, px, py, 3.5, 3.2, false); b.s(px, py + 3, WSH); }); }
+    var w = wg ? 1 : -1;
     if (hug) {
-      leg(C - 13, G - 28, C - 4, G - 22, C - 3, G - 21); leg(C + 13, G - 28, C + 4, G - 22, C + 3, G - 21);
-      leg(C - 14, G - 8, C - 6, G - 12, C - 4, G - 13); leg(C + 14, G - 8, C + 6, G - 12, C + 4, G - 13);
+      leg(12, 31, 18, 33, 18.5, 33.5); leg(32, 31, 26, 33, 25.5, 33.5);
+      leg(13, 43, 8, 36 - wg * 2, 7.5, 34 - wg * 2); leg(31, 43, 37, 36 - (1 - wg) * 2, 37.5, 34 - (1 - wg) * 2);
     } else {
-      leg(C - 13, G - 26, C - 20 - w1, G - 33, C - 21 - w1, G - 36);
-      leg(C + 13, G - 26, C + 20 + w1, G - 33, C + 21 + w1, G - 36 + wg);
-      leg(C - 14, G - 10, C - 21 + w1, G - 16, C - 22 + w1, G - 19 - wg);
-      leg(C + 14, G - 10, C + 21 - w1, G - 16, C + 22 - w1, G - 19);
+      leg(12, 30, 6, 25 + w, 5.5, 23 + w); leg(32, 30, 38, 25 - w, 38.5, 23 - w);
+      leg(13, 43, 7 - w, 37, 6.5 - w, 35); leg(31, 43, 37 + w, 37, 37.5 + w, 35);
     }
-    var hox = C - 13, hoy = G - 50 - br;
-    var hs = headFront({ expr: o.expr, ear: o.ear, mo: o.mo, acc: { head: o.acc && o.acc.head === 'sticker' ? 'sticker' : null } });
-    out.blit(hs, hox - HX, hoy - 2, true);
-    return res(out, C, G, { x: hox, y: hoy + 1, w: 27, h: 18 }, { belly: { x: C - 11, y: G - 27, w: 22, h: 20 } });
+    P.head(hx, hy, { expr: o.expr, ear: o.ear, mo: o.mo, acc: o.acc, pose: 'bellyUp' });
+    return P.res(22, G, hx, hy, { belly: { x: 11 + 7, y: 28 + 5, w: 22, h: 18 } });
   }
 
-  // side body: walk / eat / crouch / leap / bow
+  // side body shared by walk / eat / crouch / leap / bow. Head is the big front face.
   function poseSide(o) {
-    var mode = o.mode || 'walk', f = o.f || 0, W = 74, H = 60, bx = 30, G = 54, tw = o.tw || 0;
-    var dy = 0, legs, hox = bx + 13, hoy, tail, rump = o.rump || 0, bodyShape = 'std', head = {};
-    var by = G - 17;
+    var mode = o.mode || 'walk', f = o.f || 0, tw = o.tw ? 1 : 0, P = new Pose(80, 56, 10, 5), G = 44, bx = 18, by = 30, dy = 0;
+    var hx = 12, hy = 10, tail, legs, far, near, shape = 'std', rump = o.rump || 0;
     if (mode === 'walk') {
-      dy = (f % 2) ? -1 : 0;
-      var nf = [3, 0, -3, 0][f], nh = -nf, lift = (f === 1) ? 2 : 0, lift2 = (f === 3) ? 2 : 0;
-      legs = { nf: [bx + 10 + nf, G - 3 - lift], ff: [bx + 14 - nf, G - 3 - lift2], nh: [bx - 10 + nh, G - 3 - lift], fh: [bx - 6 - nh, G - 3 - lift2] };
-      hoy = by - 10 + dy; tail = [[bx - 14, by - 2 + dy], [bx - 19, by - 8 + dy], [bx - 20, by - 16 + dy], [bx - 17 + tw, by - 22 + dy]];
+      var a = [3, 0, -3, 0][f], lA = f === 1 ? 2 : 0, lB = f === 3 ? 2 : 0; dy = (f % 2) ? -1 : 0;
+      far = [[26 - a, G - 2 - lB, 26 - a, 38], [10 + a, G - 2 - lB, 10 + a, 38]];
+      near = [[10 - a, G - 2 - lA, 10 - a, 38], [28 + a, G - 2 - lA, 28 + a, 38]];
+      tail = [[4, 30 + dy], [0, 27 + dy], [-2, 21 + dy], [-1.5 + tw, 15 + dy], [0.5 + tw, 13 + dy]]; hy = 10 + dy; by = 30 + dy;
     } else if (mode === 'eat') {
-      dy = 0; legs = { nf: [bx + 13, G - 3], ff: [bx + 9, G - 3], nh: [bx - 12, G - 3], fh: [bx - 6, G - 3] };
-      hox = bx + 15; hoy = G - 17 + (o.chew ? 1 : 0);
-      tail = [[bx - 14, by - 1], [bx - 19, by - 5], [bx - 22, by - 12], [bx - 21 + tw, by - 17]];
+      var c = o.chew ? 1 : 0; hx = 14; hy = 14 + c;
+      far = [[24, G - 2, 24, 38], [13, G - 2, 13, 38]]; near = [[8, G - 2, 8, 38], [30, G - 2, 30, 38]];
+      tail = [[4, 29], [0, 26], [-2, 20], [-1.5 + tw, 14], [0.5 + tw, 12]];
     } else if (mode === 'crouch') {
-      dy = 6; legs = { nf: [bx + 14, G - 3], ff: [bx + 10, G - 3], nh: [bx - 10 + rump, G - 3], fh: [bx - 5 + rump, G - 3] };
-      hox = bx + 15; hoy = by + dy - 6; tail = [[bx - 14 + rump, by + dy - 1], [bx - 20 + rump, by + dy + 1], [bx - 25 + rump, by + dy - 1 + tw]];
+      by = 34; hx = 11; hy = 14 + 0; shape = 'low';
+      far = [[26, G - 2, 26, 40], [12 + rump, G - 2, 12 + rump, 40]]; near = [[31, G - 2, 31, 40], [7 + rump, G - 2, 7 + rump, 40]];
+      tail = [[4 + rump, 37], [-2 + rump, 38], [-7 + rump, 36 - tw], [-10 + rump, 33 - tw]];
     } else if (mode === 'leap') {
-      dy = -3; legs = { nf: [bx + 25, by - 1], ff: [bx + 21, by - 4], nh: [bx - 24, by + 8], fh: [bx - 20, by + 5] };
-      hox = bx + 14; hoy = by - 13; tail = [[bx - 14, by - 2 + dy], [bx - 21, by - 3], [bx - 27, by - 1]];
-    } else { // bow (stretch)
-      bodyShape = 'bow';
-      legs = { nf: [bx + 22, G - 3], ff: [bx + 18, G - 3], nh: [bx - 7, G - 3], fh: [bx - 2, G - 3] };
-      hox = bx + 13; hoy = G - 18; tail = [[bx - 15, by - 10], [bx - 19, by - 17], [bx - 18 + tw, by - 24]];
+      by = 28; hx = 15; hy = 6; shape = 'long';
+      far = [[40, 22, 30, 28], [-3, 33, 8, 33]]; near = [[44, 27, 31, 30], [-6, 38, 7, 35]];
+      tail = [[3, 27], [-3, 27], [-9, 29], [-14, 27]];
+    } else { // bow
+      shape = 'bow'; hx = 14; hy = 14;
+      far = [[44, G - 2, 28, 40], [14, G - 2, 14, 36]]; near = [[46, G - 1.5, 30, 41], [8, G - 2, 8, 36]];
+      tail = [[3, 22], [0, 16], [-1, 10], [0.5 + tw, 6]];
     }
-    var back = new Buf(W, H);
-    back.blit(L(W, H, function (b) { tailDraw(b, tail, 2.1); }), -1, -1);
-    function limb(p, hipx, hipy, far) {
-      return L(W, H, function (b) { b.thick([[hipx, hipy], [p[0], p[1]]], 2.3, far ? STR : FUR); b.ell(p[0] + 1, Math.min(G - 2, p[1] + 1), 3.4, 2.4, far ? WSH : WHT); });
+    function legL(set, isFar) {
+      P.layer(function (b) { set.forEach(function (l) { limb(b, l[2], l[3], l[0], l[1], 1.9, isFar ? STR : FUR); mitten(b, l[0] + 0.5, l[1] + 0.8, 3.3, 2.4, isFar); }); });
     }
-    var hy = by + 6 + dy;
-    var hipsF = bodyShape === 'bow' ? by + 10 : hy;
-    back.blit(limb(legs.fh, bx - 4 + (mode === 'crouch' ? rump : 0), hy, true), -1, -1);
-    back.blit(limb(legs.ff, bx + 8, hipsF, true), -1, -1);
-    var body = new Buf(W, H);
-    if (bodyShape === 'bow') {
-      body.ell(bx - 5, by - 3, 12, 10, FUR); body.ell(bx + 8, by + 4, 10, 8, FUR);
-      body.ell(bx + 2, by + 5, 12, 3, WHT, [FUR]); body.ell(bx + 14, by + 3, 4, 6, WHT, [FUR]);
-      bands(body, bx - 16, by - 12, bx + 6, by + 3, 6, 2, 1);
-    } else {
-      body.ell(bx, by + dy, 16, 10, FUR);
-      body.ell(bx + 1, by + 8 + dy, 12, 3, WHT, [FUR]); body.ell(bx + 13, by - 1 + dy, 4, 6, WHT, [FUR]);
-      bands(body, bx - 14, by - 10 + dy, bx + 8, by + 5 + dy, 6, 2, 1);
-    }
-    rim(body);
-    var out = new Buf(W, H); out.blit(back, 0, 0); out.blit(finish(body), -1, -1);
-    out.blit(limb(legs.nh, bx - 10 + (mode === 'crouch' ? rump : 0), hy, false), -1, -1);
-    out.blit(limb(legs.nf, bx + 10, hipsF, false), -1, -1);
-    var hd = headSide(o);
-    out.blit(hd, hox - HX, hoy - HY);
-    return res(out, bx + 3, G, { x: hox, y: hoy, w: 21, h: 17 });
+    P.layer(function (b) { tailDraw(b, tail, 1.7); });
+    legL(far, true);
+    P.layer(function (b) {
+      if (shape === 'bow') {
+        b.sq(11, 27, 10.5, 9.5, FUR, 2.2); b.sq(21, 33, 11, 7.5, FUR, 2.2); b.sq(30, 37, 8, 5.5, FUR, 2.2);
+        b.sq(20, 38, 9, 2.4, WHT, 2, [FUR]); bands(b, 3, 17, 22, 30, 8, 2, 1);
+      } else if (shape === 'long') {
+        b.sq(18, by, 17, 8.3, FUR, 2.2); b.sq(20, by + 6, 11, 2.2, WHT, 2, [FUR]); bands(b, 3, by - 9, 24, by + 3, 8, 2, 1);
+      } else if (shape === 'low') {
+        b.sq(18, by, 16, 8, FUR, 2.2); b.sq(20, by + 6, 11, 2.2, WHT, 2, [FUR]); bands(b, 3, by - 9, 24, by + 2, 8, 2, 1);
+      } else {
+        b.sq(bx, by, 15, 9.5, FUR, 2.2); b.sq(bx + 2, by + 8, 10.5, 2.6, WHT, 2, [FUR]); bands(b, 3, by - 10, 26, by + 3, 8, 2, 1);
+      }
+    });
+    legL(near, false);
+    var oo = { expr: o.expr, ear: o.ear, mo: o.mo, acc: o.acc, pose: o.pose };
+    P.head(hx, hy, oo);
+    return P.res(bx + 3, G, hx, hy);
   }
 
   function poseCurl(o) {
-    var W = 64, H = 48, X = 8, G = 40, br = o.br ? 1 : 0, tw = o.tw || 0;
-    var body = new Buf(W, H);
-    body.ell(X + 25, G - 13, 22, 13 + br * 0.5, FUR);
-    bands(body, X + 6, G - 26, X + 46, G - 3, 7, 2, 1);
-    body.ell(X + 35, G - 22, 7, 3, FURL, [FUR]);
-    rim(body);
-    var out = new Buf(W, H); out.blit(finish(body), -1, -1);
-    // tail wraps around the front
-    out.blit(L(W, H, function (b) { tailDraw(b, [[X + 44, G - 6], [X + 40, G - 1], [X + 30, G + 0], [X + 20, G - 1 + (tw ? 1 : 0)], [X + 15 + tw, G - 4]], 2.3); }), -1, -1);
-    // paws tucked under the chin, then head resting on them
-    out.blit(L(W, H, function (b) { b.ell(X + 8, G - 4, 4, 3, WHT); b.ell(X + 18, G - 3, 4, 2.6, WHT); b.s(X + 8, G - 2, WSH); b.s(X + 18, G - 1, WSH); }), -1, -1);
-    var hox = X, hoy = G - 22 - br;
-    out.blit(headFront({ expr: 'sleep', ear: o.ear, acc: o.acc, hideFace: true }), hox - HX, hoy - HY);
-    return res(out, X + 24, G, { x: hox, y: hoy, w: 27, h: 18 });
+    var br = o.br ? 1 : 0, tw = o.tw ? 1 : 0, P = new Pose(64, 52, 6, 6), G = 42, hx = -2, hy = 12;
+    P.layer(function (b) {
+      b.sq(27, G - 13 - br * 0.8, 23, 13 + br * 0.8, FUR, 2.3);
+      bands(b, 12, 14, 50, 36, 8, 2, 1);
+      b.sq(36, 19, 7, 2.5, FURL, 2, [FUR]);
+    });
+    P.layer(function (b) { tailDraw(b, [[49, 33], [47, 39.5], [40, 42], [33, 41.5], [28 + tw, 39.5]], 1.9); });
+    P.head(hx, hy, { expr: 'sleep', ear: o.ear, acc: o.acc, pose: 'curl' });
+    P.layer(function (b) { mitten(b, 14, G - 1.2, 3.4, 2, false); mitten(b, 23, G - 1.2, 3.4, 2, false); });
+    return P.res(27, G, hx, hy);
   }
 
-  // cardboard box with ส้ม peeking. vis = how many head rows show above the front panel (0 = empty box)
+  // cardboard box with ส้ม peeking. vis (old units, head = 18 rows) -> rows of new head shown above the front panel
   function poseBox(o) {
-    var W = 48, H = 54, C = 24, P = 30, PB = 46, vis = o.vis || 0;
-    var out = new Buf(W, H);
-    out.blit(L(W, H, function (b) { b.rect(C - 15, P - 6, 31, 8, 38); b.rect(C - 15, P - 6, 31, 1, 39); }), -1, -1);
+    var C = 26, P0 = 38, PB = 54, vis = o.vis || 0, rows = Math.min(27, Math.round(vis * 1.45)), P = new Pose(52, 58, 0, 0);
+    P.layer(function (b) { b.rect(C - 19, P0 - 6, 39, 8, 38); b.rect(C - 19, P0 - 6, 39, 1, 39); });
+    var hy = P0 - 1 - rows;
     if (vis) {
-      var hoy = P - vis;
-      out.blit(headFront({ expr: o.expr || 'half', ear: o.ear, acc: o.acc }), C - 13 - HX, hoy - HY);
-      if (vis > 16) {
-        out.blit(L(W, H, function (b) { b.ell(C - 10, P - 1, 3, 2, WHT); b.ell(C + 10, P - 1, 3, 2, WHT); }), -1, -1);
-      }
+      P.head(C - 22, hy, { expr: o.expr, ear: o.ear, acc: o.acc, pose: 'inBox' });
+      if (rows > 20) P.layer(function (b) { mitten(b, C - 13, P0 - 1, 3.4, 2.2, false); mitten(b, C + 13, P0 - 1, 3.4, 2.2, false); });
     }
-    out.blit(L(W, H, function (b) {
-      b.rect(C - 17, P, 35, PB - P, 37);
-      b.rect(C - 17, P, 35, 2, 39); b.rect(C - 17, PB - 3, 35, 3, 38);
-      b.rect(C - 3, P + 2, 7, PB - P - 5, 39); b.rect(C - 3, P + 2, 7, 1, 40);
-      b.rect(C - 11, P + 7, 3, 1, 38); b.rect(C + 9, P + 7, 3, 1, 38);
-    }), -1, -1);
-    return res(out, C, PB, { x: C - 13, y: P - vis, w: 27, h: Math.max(1, vis) }, { box: true });
+    P.layer(function (b) {
+      b.rect(C - 21, P0, 43, PB - P0, 37);
+      b.rect(C - 21, P0, 43, 2, 39); b.rect(C - 21, PB - 3, 43, 3, 38);
+      b.rect(C - 3, P0 + 2, 7, PB - P0 - 5, 39); b.rect(C - 3, P0 + 2, 7, 1, 40);
+      b.rect(C - 14, P0 + 8, 3, 1, 38); b.rect(C + 12, P0 + 8, 3, 1, 38);
+    });
+    return P.res(C, PB, C - 22, hy, { box: true });
   }
 
   var BUILD = { sit: poseSit, loaf: poseLoaf, lieSide: poseLie, bellyUp: poseBellyUp, side: poseSide, curl: poseCurl, box: poseBox };
 
-  // pose names used by cat.js map to builders + options
   function specToBuild(s) {
     var o = {}, k;
     for (k in s) o[k] = s[k];
@@ -420,7 +382,7 @@
     }
   }
 
-  function toCanvas(buf, crop) {
+  function toCanvas(buf) {
     var minx = 1e9, miny = 1e9, maxx = -1, maxy = -1, x, y;
     for (y = 0; y < buf.h; y++) for (x = 0; x < buf.w; x++) if (buf.d[y * buf.w + x]) {
       if (x < minx) minx = x; if (x > maxx) maxx = x; if (y < miny) miny = y; if (y > maxy) maxy = y;
@@ -442,7 +404,7 @@
   var cache = {};
   function accKey(a) { return (a && a.head) || '-'; }
   function get(spec) {
-    var key = [spec.pose, spec.f || 0, spec.expr || 'half', spec.br ? 1 : 0, spec.tw || 0, spec.ear ? 1 : 0, spec.mo ? 1 : 0,
+    var key = [spec.pose, spec.f || 0, spec.expr || 'open', spec.br ? 1 : 0, spec.tw || 0, spec.ear ? 1 : 0, spec.mo ? 1 : 0,
       spec.chew ? 1 : 0, spec.rump || 0, spec.wg || 0, spec.hug ? 1 : 0, spec.pt || 0, spec.vis || 0, accKey(spec.acc)].join('|');
     var hit = cache[key];
     if (hit) return hit;
@@ -456,7 +418,6 @@
     return m;
   }
 
-  // standalone accessory canvas for UI icons
   function accIcon(id) {
     var buf = ACC[id] ? ACC[id]() : null;
     if (id === 'sticker') { buf = new Buf(10, 10); buf.ell(4.5, 4.5, 4, 4, 28); buf.s(2, 2, 29); buf.s(3, 2, 29); buf.s(2, 3, 29); buf = finish(buf); }

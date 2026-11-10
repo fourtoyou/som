@@ -4,7 +4,7 @@
   'use strict';
   var R = root.SomRoom, SP = root.SomSprites, Fx = root.SomFx, P = R.SPOT, F = R.FLOOR;
   var FLIP = { walk: 1, eat: 1, crouch: 1, leap: 1, stretch: 1, lieSide: 1 };
-  var BASE = { sit: 'half', loaf: 'half', lieSide: 'sleep', curl: 'sleep', bellyUp: 'sleep', walk: 'half', eat: 'half', crouch: 'open', leap: 'open', stretch: 'meow', groom: 'sleep', bat: 'open', inBox: 'half' };
+  var BASE = { sit: 'open', loaf: 'open', lieSide: 'sleep', curl: 'sleep', bellyUp: 'sleep', walk: 'open', eat: 'happy', crouch: 'open', leap: 'open', stretch: 'meow', groom: 'sleep', bat: 'open', inBox: 'open' };
   var SHADOW = { sit: 28, loaf: 32, lieSide: 40, bellyUp: 32, walk: 36, eat: 36, crouch: 36, leap: 30, stretch: 36, groom: 28, bat: 28 };
   function rr(a, b) { return a + Math.random() * (b - a); }
   function pick(w) { var r = Math.random(), s = 0; for (var i = 0; i < w.length; i++) { s += w[i][0]; if (r < s) return w[i][1]; } return w[w.length - 1][1]; }
@@ -12,7 +12,7 @@
   var Cat = {
     x: 62, y: 128, dir: 1, lift: 0, time: 0, phase: 'day', hour: 12, acc: { head: null },
     steps: [], step: null, st: 0, ov: null, petT: 0, wakeAt: [], awakeUntil: 0, busy: false,
-    nextBlink: 2, blinkUntil: 0, nextEar: 6, earUntil: 0, nextTw: 3, twUntil: 0, nextZ: 1, nextSlow: 20, slowUntil: 0, nextPaw: 4, pawUntil: 0,
+    nextBlink: 2, blinkUntil: 0, nextEar: 6, earUntil: 0, nextTw: 3, twUntil: 0, nextZ: 1, nextSlow: 20, slowUntil: 0, nextDrowsy: 30, drowsyUntil: 0, nextPaw: 4, pawUntil: 0,
     onBubble: null
   };
 
@@ -22,6 +22,7 @@
   function wander() {
     var x = rr(F.x0, F.x1), y = rr(F.y0 + 6, F.y1);
     if (x > 92 && y < 112) y = rr(114, F.y1);
+    if (x < 72 && y > P.bed.y - 32) y = rr(F.y0 + 6, P.bed.y - 32); // keep out of the (bigger) bed
     return [goto_(x, y), hold({ pose: 'sit' }, rr(5000, 9000))];
   }
   function actFor(phase, hour) {
@@ -37,7 +38,7 @@
         return pick([[0.7, [goto_(spot.x, spot.y), hold({ pose: 'lieSide', say: 'sun' }, rr(15000, 25000))]],
           [0.9, [goto_(spot.x, spot.y), hold({ pose: 'loaf', say: 'sun' }, rr(10000, 16000))]], [1, wander()]]);
       case 'day':
-        return pick([[0.5, [goto_(P.fan.x, P.fan.y), hold({ pose: 'lieSide', expr: 'half', say: 'fan' }, rr(14000, 25000))]],
+        return pick([[0.5, [goto_(P.fan.x, P.fan.y), hold({ pose: 'lieSide', expr: 'open', say: 'fan' }, rr(14000, 25000))]],
           [0.72, [goto_(P.fan.x, P.fan.y + 2), hold({ pose: 'bellyUp', say: 'fan' }, rr(12000, 20000))]],
           [0.9, wander()], [1, [hold({ pose: 'sit' }, rr(8000, 12000))]]]);
       case 'evening':
@@ -56,7 +57,7 @@
     Cat.phase = phase; Cat.hour = hour; Cat.busy = false; Cat.ov = null; Cat.awakeUntil = 0;
     var sp = R.beamSpot(hour), plan;
     if (phase === 'morning') { Cat.x = sp.x; Cat.y = sp.y; plan = [hold({ pose: 'lieSide', say: 'sun' }, rr(15000, 25000))]; }
-    else if (phase === 'day') { Cat.x = P.fan.x; Cat.y = P.fan.y; plan = [hold({ pose: 'lieSide', expr: 'half', say: 'fan' }, rr(14000, 25000))]; }
+    else if (phase === 'day') { Cat.x = P.fan.x; Cat.y = P.fan.y; plan = [hold({ pose: 'lieSide', expr: 'open', say: 'fan' }, rr(14000, 25000))]; }
     else if (phase === 'night') { Cat.x = P.bed.x; Cat.y = P.bed.y; plan = [hold({ pose: 'curl' }, Infinity)]; }
     else if (phase === 'evening') { Cat.x = P.center.x; Cat.y = P.center.y; plan = [hold({ pose: 'sit', look: 1 }, 12000)]; }
     else { Cat.x = 82; Cat.y = 142; plan = [hold({ pose: 'sit' }, 12000)]; }
@@ -99,8 +100,9 @@
     if (t > Cat.nextBlink) { Cat.blinkUntil = t + 0.13; Cat.nextBlink = t + rr(2.5, 6); }
     if (t > Cat.nextEar) { Cat.earUntil = t + 0.28; Cat.nextEar = t + rr(6, 12); }
     if (t > Cat.nextTw) { Cat.twUntil = t + 0.4; Cat.nextTw = t + rr(3, 8); }
+    if (t > Cat.nextDrowsy) { Cat.drowsyUntil = t + 3.5; Cat.nextDrowsy = t + rr(40, 80); }
     if (t > Cat.nextPaw) { Cat.pawUntil = t + 0.3; Cat.nextPaw = t + rr(4, 9); }
-    if (Cat.pose() === 'curl' && t > Cat.nextZ) { Cat.nextZ = t + 1.8; var r = Cat.rects(); Fx.zzz(r.head.x + (Cat.dir < 0 ? 0 : 20), r.head.y - 2); }
+    if (Cat.pose() === 'curl' && t > Cat.nextZ) { Cat.nextZ = t + 1.8; var r = Cat.rects(); Fx.zzz(r.head.x + r.head.w - 6, r.head.y - 2); }
   };
 
   Cat.pose = function () { return (Cat.ov && Cat.ov.pose) || (Cat.step && Cat.step.t === 'hold' ? Cat.step.pose : (Cat.step && Cat.step.t === 'leap' ? 'leap' : (Cat.step && Cat.step.t === 'goto' ? 'walk' : 'sit'))); };
@@ -132,7 +134,11 @@
     var hs = s && s.t === 'hold' ? s : {};
     expr = ov.expr || hs.expr || BASE[pose] || 'half';
     if (Cat.petT > 0 && pose !== 'curl' && !ov.expr) expr = (pose === 'eat' || pose === 'inBox') ? expr : 'happy';
-    if (expr === 'half' || expr === 'open') { if (t < Cat.blinkUntil || t < Cat.slowUntil) expr = 'blink'; }
+    if (expr === 'open' && (pose === 'sit' || pose === 'loaf') && t < Cat.drowsyUntil && !Cat.busy) expr = 'drowsy'; // rare sleepy idle look
+    if (expr === 'open' || expr === 'drowsy') {
+      var sl = Cat.slowUntil - t; // slow blink: lids sink, close, rise
+      if (sl > 0) expr = (sl > 0.55 || sl < 0.15) ? 'drowsy' : 'blink'; else if (t < Cat.blinkUntil) expr = 'blink';
+    }
     sp = { pose: pose, expr: expr, br: Math.floor(t / (pose === 'curl' ? 1.7 : 1.2)) % 2, tw: t < Cat.twUntil ? 1 : 0, ear: t < Cat.earUntil ? 1 : 0, acc: Cat.acc };
     if (pose === 'walk') sp.f = Math.floor(t * 7) % 4;
     if (pose === 'eat') { sp.chew = Math.floor(t * 4) % 2; sp.mo = sp.chew; }

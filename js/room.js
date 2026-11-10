@@ -12,7 +12,7 @@
     night:   { skyA: '#10173F', skyB: '#26306E', line: '#3A4580', glint: '#33407F', fan: false, beam: 0, tint: [] }
   };
   var ORDER = ['dawn', 'morning', 'day', 'evening', 'night'];
-  var LAMP = { x: 66, y: 22 }, BEDC = { x: 27, y: 133 };
+  var LAMP = { x: 66, y: 22 }, BEDC = { x: 31, y: 135 };
   var ROWS = 7;
 
   function mk(w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
@@ -76,19 +76,18 @@
 
   var bedPal = [null, '#5B3420', '#273F63', '#3A5A8C', '#9C9C9C', '#838383', '#B5B5B5', '#FFFFFF'];
   function bedBuild() {
-    var back = new Buf(52, 40), front = new Buf(52, 40), cx = 26, cy = 20, x, y, a;
-    back.ell(cx, cy, 23, 17, 2); back.ell(cx, cy - 1, 22, 16, 3, [2]);
-    back.ell(cx, cy, 22, 16, 2);
-    back.ell(cx, cy, 17.5, 11.5, 5); back.ell(cx - 1, cy - 1, 16, 10, 4); back.ell(cx - 4, cy - 4, 6, 3, 6, [4]);
+    var back = new Buf(68, 50), front = new Buf(68, 50), cx = 34, cy = 25, x, y;
+    back.ell(cx, cy, 33, 22, 2); back.ell(cx, cy - 1, 32, 21, 3, [2]);
+    back.ell(cx, cy, 32, 21, 2);
+    back.ell(cx, cy, 27, 16, 5); back.ell(cx - 1, cy - 1, 25.5, 15, 4); back.ell(cx - 6, cy - 6, 9, 3.5, 6, [4]);
     // front rim = lower half of the ring band
-    for (y = cy + 3; y < 40; y++) for (x = 0; x < 52; x++) {
-      var o = Math.pow((x - cx) / 23.5, 2) + Math.pow((y - cy) / 17.5, 2), i = Math.pow((x - cx) / 18, 2) + Math.pow((y - cy) / 12, 2);
-      if (o <= 1 && i > 1) front.s(x, y, y > cy + 12 ? 2 : (y < cy + 6 ? 3 : 2));
+    for (y = cy + 4; y < 50; y++) for (x = 0; x < 68; x++) {
+      var o = Math.pow((x - cx) / 33.5, 2) + Math.pow((y - cy) / 22.5, 2), i = Math.pow((x - cx) / 27.5, 2) + Math.pow((y - cy) / 16.5, 2);
+      if (o <= 1 && i > 1) front.s(x, y, y > cy + 17 ? 2 : (y < cy + 9 ? 3 : 2));
     }
-    // tiny white cat-face dots on the rim
     function dot(b, x, y) { b.s(x, y, 7); b.s(x + 2, y, 7); b.rect(x, y + 1, 3, 1, 7); }
-    [[8, 9], [15, 4], [30, 3], [38, 6], [44, 12]].forEach(function (p) { dot(back, p[0], p[1]); });
-    [[6, 27], [13, 33], [32, 33], [40, 28]].forEach(function (p) { dot(front, p[0], p[1]); });
+    [[9, 12], [19, 5], [42, 4], [53, 8], [61, 16]].forEach(function (p) { dot(back, p[0], p[1]); });
+    [[7, 36], [17, 44], [46, 44], [57, 37]].forEach(function (p) { dot(front, p[0], p[1]); });
     return { back: bufCanvas(finish(back), bedPal), front: bufCanvas(finish(front), bedPal) };
   }
 
@@ -166,14 +165,14 @@
   /* ----- public drawing ----- */
   var Room = {
     W: W, H: H, PH: PH, ORDER: ORDER,
-    SPOT: { bed: { x: 27, y: 142 }, bowls: { x: 85, y: 146 }, center: { x: 62, y: 128 }, fan: { x: 84, y: 116 } },
+    SPOT: { bed: { x: 31, y: 147 }, bowls: { x: 85, y: 146 }, center: { x: 62, y: 128 }, fan: { x: 84, y: 116 } },
     FLOOR: { x0: 12, x1: 112, y0: 98, y1: 148 },
     D: function () { return D; }, VH: function () { return H; },
     // virtual height 160..224: extra rows become floor; bed, bowls and spots stay anchored to the bottom
     setH: function (h) {
       h = Math.max(160, Math.min(224, Math.round(h))); if (h === H && bed) return D;
       H = h; D = h - 160; ROWS = Math.ceil((H - FLOOR_Y) / 16); bg = {}; ov = {};
-      BEDC.y = 133 + D; this.SPOT.bed.y = 142 + D; this.SPOT.bowls.y = 146 + D; this.SPOT.center.y = 128 + Math.round(D / 2);
+      BEDC.y = 135 + D; this.SPOT.bed.y = 147 + D; this.SPOT.bowls.y = 146 + D; this.SPOT.center.y = 128 + Math.round(D / 2);
       this.FLOOR.y1 = 148 + D; this.H = H; return D;
     },
     beamSpot: function (hour) { return { x: 40 + Math.max(0, Math.min(4, hour - 7)) * 2, y: 108 }; },
@@ -202,8 +201,8 @@
       init(); ctx.drawImage(bowls.water, 91, 135 + D); ctx.drawImage(bowls.food, 107, 135 + D);
       if (food) { var c = IC.canvas(food); ctx.drawImage(c, 114 - Math.floor(c.width / 2), 136 + D - Math.floor(c.height / 2)); }
     },
-    drawBed: function (ctx) { init(); ctx.drawImage(bed.back, 1, 113 + D); },
-    drawBedFront: function (ctx) { init(); ctx.drawImage(bed.front, 1, 113 + D); },
+    drawBed: function (ctx) { init(); ctx.drawImage(bed.back, -3, 110 + D); },
+    drawBedFront: function (ctx) { init(); ctx.drawImage(bed.front, -3, 110 + D); },
     drawOverlay: function (ctx, ph, prev, t) {
       if (prev && t < 1) { ctx.drawImage(overlayFor(prev), 0, 0); ctx.globalAlpha = t; ctx.drawImage(overlayFor(ph), 0, 0); ctx.globalAlpha = 1; }
       else ctx.drawImage(overlayFor(ph), 0, 0);
