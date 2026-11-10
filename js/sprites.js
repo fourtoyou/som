@@ -3,11 +3,11 @@
   'use strict';
 
   var PAL = [null,
-    '#603824', '#D47C38', '#F0A358', '#FACC92', '#FFF9EE', '#ECDCC8', '#F4969E', '#ACD470', '#302822', '#7A4A34',
-    '#FFF1E6', '#F0D6C8', '#FAACA4', '#FFFFFF', null, null, null, null, null,
+    '#7C462C', '#D47C38', '#F0A358', '#FACC92', '#FFF9EE', '#ECDCC8', '#F4969E', '#F5CC48', '#302822', '#7A4A34',
+    '#FFF1E6', '#F0D6C8', '#FAACA4', '#FFFFFF', '#E8924E', '#FCC6C6', '#FFF0A0', '#B07652', '#603824',
     '#F2C14E', '#C98F1E', '#FFE69A', '#D8324B', '#2FAE6A', '#3C63C8', '#E03B4F', '#A82237', '#FF8A1F', '#FFC060',
     '#D9444F', '#FFFFFF', '#2FA39E', '#1F7C78', '#1E242B', '#3A4656', '#FFFFFF', '#C9955A', '#A4733F', '#DDB27A', '#EAD0A0'];
-  var OUT = 1, STR = 2, FUR = 3, FURL = 4, WHT = 5, WSH = 6, PNK = 7, GRN = 8, EYE = 9, FRK = 10, BEL = 11, BEL2 = 12, BLU = 13, HI = 14;
+  var OUT = 1, STR = 2, FUR = 3, FURL = 4, WHT = 5, WSH = 6, PNK = 7, GRN = 8, EYE = 9, FRK = 10, BEL = 11, BEL2 = 12, BLU = 13, HI = 14, SHD = 15, PNKL = 16, IRL = 17, OUTS = 18, MTH = 19;
 
   /* ---------- Buf (tx/ty = drawing origin shift; blit/finish ignore it) ---------- */
   function Buf(w, h) { this.w = w; this.h = h; this.d = new Uint8Array(w * h); this.tx = 0; this.ty = 0; }
@@ -145,6 +145,10 @@
     b.pts(STR, T([[8, 17], [9, 17], [8, 19], [9, 19], [35, 17], [36, 17], [35, 19], [36, 19]]));
     if (!fl) b.pts(FURL, T([[14, 6], [15, 6], [16, 5], [17, 5]]));
     else b.pts(FURL, T([[14, 6], [15, 6], [16, 5], [17, 5]]));
+    b.pts(SHD, T([[9, 22], [34, 22], [10, 23], [33, 23], [11, 24], [12, 24], [31, 24], [32, 24], [13, 25], [14, 25], [15, 25], [28, 25], [29, 25], [30, 25]]
+      .concat([16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27].map(function (x) { return [x, 26]; }))), [FUR]);
+    b.pts(FURL, T([[13, 7], [18, 5]]));
+    b.pts(PNKL, T([[11, 6], [11, 7], [32, 6], [32, 7]]), [PNK]);
   }
   function expOf(o) {
     var e = o.expr || 'open', mo = !!o.mo, eyes = e;
@@ -153,23 +157,22 @@
     if (e === 'meow') { eyes = o.pose === 'stretch' ? 'happy' : 'open'; mo = true; }
     return { eyes: eyes, mo: mo };
   }
+  var EYES = {
+    open: ['.EEEE.', 'EHHEEE', 'EHHEEE', 'EGGGGE', 'EGGGYE', '.EEEE.'],
+    happy: ['......', '......', '.EEEE.', 'E....E', '......', '......'],
+    sleep: ['......', '......', '......', 'E....E', '.EEEE.', '......'],
+    blink: ['......', '......', '......', 'EEEEEE', '......', '......'],
+    drowsy: ['......', '......', 'EEEEEE', 'EGGGYE', '.EEEE.', '......']
+  };
+  var EMAP = { E: EYE, H: HI, G: GRN, Y: IRL };
   function faceDraw(b, ox, oy, o) {
-    var x = expOf(o), E = EYE, ex, i, P = function (c, list) { b.pts(c, list.map(function (q) { return [q[0] + ox, q[1] + oy]; })); };
-    P(WSH, [[21, 26], [22, 26], [23, 26]]);
-    [13, 28].forEach(function (ex) {
-      if (x.eyes === 'open') {
-        P(E, [[ex, 14], [ex + 1, 14], [ex - 1, 15], [ex + 2, 15], [ex - 1, 16], [ex + 2, 16], [ex - 1, 17], [ex + 2, 17], [ex, 18], [ex + 1, 18]]);
-        P(GRN, [[ex + 1, 15], [ex, 16], [ex, 17]]); P(E, [[ex + 1, 16], [ex + 1, 17]]); P(HI, [[ex, 15]]);
-      } else if (x.eyes === 'drowsy') {
-        P(E, [[ex - 1, 16], [ex, 16], [ex + 1, 16], [ex + 2, 16], [ex - 1, 17], [ex + 2, 17], [ex, 18], [ex + 1, 18]]); P(GRN, [[ex, 17], [ex + 1, 17]]);
-      } else if (x.eyes === 'happy') P(E, [[ex - 1, 17], [ex, 16], [ex + 1, 16], [ex + 2, 17]]);
-      else if (x.eyes === 'sleep') P(E, [[ex - 1, 16], [ex, 17], [ex + 1, 17], [ex + 2, 16]]);
-      else P(E, [[ex - 1, 17], [ex, 17], [ex + 1, 17], [ex + 2, 17]]); // blink
-    });
+    var x = expOf(o), P = function (c, list) { b.pts(c, list.map(function (q) { return [q[0] + ox, q[1] + oy]; })); };
+    P(WSH, [[21, 26], [22, 26]]);
+    [11, 27].forEach(function (ex) { b.stamp(EYES[x.eyes] || EYES.blink, ex + ox, 14 + oy, EMAP); });
     P(PNK, [[21, 19], [22, 19]]); P(FRK, [[23, 19]]);
-    if (x.mo) { P(OUT, [[21, 20], [22, 20], [23, 20], [21, 21], [23, 21], [22, 22]]); P(PNK, [[22, 21]]); }
-    else P(OUT, [[22, 20], [20, 21], [21, 21], [23, 21], [24, 21]]);
-    P(BLU, [[12, 20], [13, 20], [31, 20], [32, 20]]);
+    if (x.mo) b.stamp(['MMMM', 'MPPM', '.MM.'], 20 + ox, 20 + oy, { M: MTH, P: PNK });
+    else P(MTH, [[21, 20], [22, 20], [19, 21], [20, 21], [23, 21], [24, 21]]);
+    P(BLU, [[11, 20], [12, 20], [13, 20], [30, 20], [31, 20], [32, 20]]);
   }
 
   /* ---------- accessories ---------- */
@@ -217,6 +220,13 @@
     return this;
   };
   Pose.prototype.res = function (ax, G, hx, hy, extra) {
+    var d = this.out.d, w = this.out.w, h = this.out.h, hit = [], i, x, y;
+    function soft(v) { return v === WHT || v === WSH; }
+    for (i = 0; i < d.length; i++) if (d[i] === OUT) { // soft outline next to cream (concept soften())
+      x = i % w; y = (i - x) / w;
+      if ((x > 0 && soft(d[i - 1])) || (x < w - 1 && soft(d[i + 1])) || (y > 0 && soft(d[i - w])) || (y < h - 1 && soft(d[i + w]))) hit.push(i);
+    }
+    hit.forEach(function (k) { d[k] = OUTS; });
     var r = { buf: this.out, ax: ax + this.tx + 1, ay: G + this.ty + 2, head: { x: hx + 7 + this.tx + 1, y: hy + 4 + this.ty + 1, w: 30, h: 23 } };
     for (var k in extra) r[k] = extra[k];
     return r;
@@ -232,7 +242,7 @@
     for (x = -P.tx; x < P.W - P.tx; x++) { var u = o.g(x, fy); if ((u === WHT || u === WSH) && Math.abs(x + 0.5 - cx) <= rx + 0.5) xs.push(x); }
     if (xs.length < 4) return;
     var m = xs[0], w = xs.length, ks = w <= 5 ? [1, 3] : w === 6 ? [1, 4] : [2, w - 3];
-    ks.forEach(function (k) { o.s(m + k, fy, OUT); });
+    ks.forEach(function (k) { o.s(m + k, fy, WSH); });
   }
   // paw seen from below (raised / belly-up): white bean + pink main pad + 3 toe dots
   function sole(P, cx, cy) {
@@ -251,17 +261,25 @@
   function poseSit(o) {
     var br = o.br ? 1 : 0, tw = o.tw ? 1 : 0, paw = o.paw || '', P = new Pose(60, 54, 7, 7);
     var wave = paw.indexOf('bat') === 0, groom = paw.indexOf('groom') === 0, f = /1$/.test(paw) ? 1 : 0, legs = [];
-    P.layer(function (b) { tailDraw(b, [[30, 39.2], [33.5, 39.8], [37, 39.6], [39.6, 38.2], [40.8 + tw * 0.8, 35.8 - tw], [40.2 + tw * 1.2, 33.6 - tw * 1.4]], 1.8); });
-    P.layer(function (b) { b.sq(10.8, 35.6, 6.8, 6.4, FUR); b.sq(33.2, 35.6, 6.8, 6.4, FUR); b.pts(STR, [[5, 33], [6, 32], [7, 31], [5, 36], [39, 33], [38, 32], [37, 31], [39, 36]]); }); // big round haunches (user picked B): the body outline draws the thigh line
+    P.layer(function (b) { tailDraw(b, [[30, 39.2], [33.5, 39.8], [37, 39.6], [39.6, 38.2], [40.8 + tw * 0.8, 35.8 - tw], [40.2 + tw * 1.2, 33.6 - tw * 1.4]], 2.0); });
     P.layer(function (b) {
       b.sq(22, 32.5, 11, 9, FUR, 2.2);
+      for (var x = 14; x <= 30; x++) b.s(x, 29, SHD); // the head's shadow on the chest
       headBase(b, 0, -br, o);
-      b.pts(STR, [[12, 30], [13, 30], [12, 32], [32, 30], [31, 30], [32, 32]]);
+    });
+    P.layer(function (b) { // haunches in front of the body: their own outline is the thigh line
+      b.sq(10.8, 35.6, 6.8, 6.4, FUR); b.sq(33.2, 35.6, 6.8, 6.4, FUR);
+      b.pts(STR, [[5, 33], [6, 32], [7, 31], [5, 36], [39, 33], [38, 32], [37, 31], [39, 36]]);
+      b.pts(SHD, [[6, 40], [7, 41], [8, 41], [38, 40], [37, 41], [36, 41]]);
     });
     if (!wave) legs.push(19);
     if (!groom) legs.push(25);
     legs.forEach(function (x) { P.layer(function (b) { limb(b, x, 30, x, 38.5, 2.5, FUR); }, 34); }); // front legs grow out of the chest
-    P.out.sq(22, 29.5, 5.2, 5.6, WHT, 2, [FUR]); // cream chest painted over the leg tops
+    for (var cy = 29; cy <= 35; cy++) for (var cx = 16; cx <= 28; cx++) { // cream chest below the chin
+      var ex = (cx + 0.5 - 22) / 5.2, ey = (cy + 0.5 - 29.5) / 5.6;
+      if (ex * ex + ey * ey <= 1) P.out.s(cx, cy, WHT, [FUR, SHD]);
+    }
+    P.out.s(20, 35, WHT, [FUR]); P.out.s(24, 35, WHT, [FUR]);
     faceDraw(P.out, 0, -br, o); accHead(P.out, o.acc, 0, -br);
     bean(P, 10.5, 40.8, 3, 1.7); bean(P, 33.5, 40.8, 3, 1.7);
     legs.forEach(function (x) { bean(P, x, 40.4, 3.4, 1.9); });
