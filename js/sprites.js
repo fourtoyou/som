@@ -129,7 +129,6 @@
     n = pts.length; var r1 = Math.round(n * 0.4), r2 = Math.round(n * 0.667);
     for (i = 0; i < n; i++) b.sq(pts[i][0], pts[i][1], r, r, (i === r1 || i === r1 + 1 || i === r2 || i === r2 + 1) ? STR : FUR, 2);
   }
-  function mitten(b, x, y, rx, ry, far) { b.sq(x, y, rx, ry, far ? WSH : WHT, 2); }
 
   /* ---------- head (cute.py coordinates; head origin ox,oy shifts everything) ---------- */
   function headBase(b, ox, oy, o) {
@@ -199,8 +198,17 @@
 
   /* ---------- pose canvas: layers share one frame; out.tx/ty map frame coords onto the padded output ---------- */
   function Pose(W, H, tx, ty) { this.W = W; this.H = H; this.tx = tx; this.ty = ty; this.out = new Buf(W + 2, H + 2); this.out.tx = tx + 1; this.out.ty = ty + 1; }
-  Pose.prototype.layer = function (fn) {
-    var b = new Buf(this.W, this.H); b.tx = this.tx; b.ty = this.ty; fn(b); this.out.blit(finish(b), 0, 0); return this;
+  // cut = frame y: outline pixels of this layer above it are dropped, so a leg grows out of the body instead of being stuck on
+  Pose.prototype.layer = function (fn, cut) {
+    var b = new Buf(this.W, this.H); b.tx = this.tx; b.ty = this.ty; fn(b);
+    var f = finish(b), o = this.out, i, y;
+    for (i = 0; i < f.d.length; i++) {
+      if (!f.d[i]) continue;
+      y = Math.floor(i / f.w) - 1 - this.ty;
+      if (cut != null && f.d[i] === OUT && y < cut) continue;
+      o.d[i] = f.d[i];
+    }
+    return this;
   };
   Pose.prototype.head = function (ox, oy, o) { // separate outlined head + face + accessory
     var self = this;
@@ -214,22 +222,59 @@
     return r;
   };
 
+  /* ---------- limb vocabulary (dev/concept/limbs.py): bean paws, soles, thigh arcs ---------- */
+  // paw = its own outlined layer (never merges with body/bib); toe notches on its bottom row
+  function bean(P, cx, cy, rx, ry, far) {
+    P.layer(function (b) { b.sq(cx, cy, rx, ry, far ? WSH : WHT); });
+    var o = P.out, x, y, fy = null, xs = [], x0 = Math.round(cx - rx) - 1, x1 = Math.round(cx + rx) + 1;
+    for (y = -P.ty; y < P.H - P.ty; y++) for (x = x0; x <= x1; x++) { var v = o.g(x, y); if (v === WHT || v === WSH) { fy = y; break; } }
+    if (fy === null) return;
+    for (x = -P.tx; x < P.W - P.tx; x++) { var u = o.g(x, fy); if ((u === WHT || u === WSH) && Math.abs(x + 0.5 - cx) <= rx + 0.5) xs.push(x); }
+    if (xs.length < 4) return;
+    var m = xs[0], w = xs.length, ks = w <= 5 ? [1, 3] : w === 6 ? [1, 4] : [2, w - 3];
+    ks.forEach(function (k) { o.s(m + k, fy, OUT); });
+  }
+  // paw seen from below (raised / belly-up): white bean + pink main pad + 3 toe dots
+  function sole(P, cx, cy) {
+    P.layer(function (b) { b.sq(cx, cy, 3.3, 2.9, WHT); });
+    var m = Math.round(cx - 0.5);
+    P.out.pts(PNK, [[m - 1, cy + 0.6], [m, cy + 0.6], [m + 1, cy + 0.6], [m, cy + 1.6], [m - 2, cy - 1.4], [m, cy - 2.2], [m + 2, cy - 1.4]]);
+  }
+  // thigh line: part of an ellipse edge, angles in degrees, 90 = down; drawn on the finished pose buffer
+  function arc(P, cx, cy, rx, ry, a0, a1, c) {
+    var n = Math.floor(Math.abs(a1 - a0) / 2) + 1;
+    for (var i = 0; i <= n; i++) { var t = (a0 + (a1 - a0) * i / n) * Math.PI / 180; P.out.s(cx + rx * Math.cos(t) - 0.5, cy + ry * Math.sin(t) - 0.5, c); }
+  }
+  function thigh(P, cx, cy) { arc(P, cx, cy, 6, 5.6, -110, 70, OUT); arc(P, cx, cy, 3.4, 3, -100, -10, STR); }
+
   /* ---------- poses ---------- */
   function poseSit(o) {
     var br = o.br ? 1 : 0, tw = o.tw ? 1 : 0, paw = o.paw || '', P = new Pose(60, 54, 7, 7);
-    var raiseL = paw.indexOf('bat') === 0, raiseR = paw.indexOf('groom') === 0, f = /1$/.test(paw) ? 1 : 0;
+    var wave = paw.indexOf('bat') === 0, groom = paw.indexOf('groom') === 0, f = /1$/.test(paw) ? 1 : 0, legs = [];
+    P.layer(function (b) { tailDraw(b, [[30, 39.2], [33.5, 39.8], [37, 39.6], [39.6, 38.2], [40.8 + tw * 0.8, 35.8 - tw], [40.2 + tw * 1.2, 33.6 - tw * 1.4]], 1.8); });
+    P.layer(function (b) { b.sq(10.8, 35.6, 6.8, 6.4, FUR); b.sq(33.2, 35.6, 6.8, 6.4, FUR); b.pts(STR, [[5, 33], [6, 32], [7, 31], [5, 36], [39, 33], [38, 32], [37, 31], [39, 36]]); }); // big round haunches (user picked B): the body outline draws the thigh line
     P.layer(function (b) {
-      tailDraw(b, [[30, 39.2], [33.5, 39.8], [37, 39.6], [39.6, 38.2], [40.8 + tw * 0.8, 35.8 - tw], [40.2 + tw * 1.2, 33.6 - tw * 1.4]], 1.8);
-      b.sq(22, 32, 12.5, 9.5, FUR, 2.2);
-      b.sq(22, 30, 6.5, 7.5, WHT, 2, [FUR]);
-      if (!raiseL) b.sq(17.5, 40, 3.4, 2.4, WHT);
-      if (!raiseR) b.sq(26.5, 40, 3.4, 2.4, WHT);
+      b.sq(22, 32.5, 11, 9, FUR, 2.2);
       headBase(b, 0, -br, o);
-      b.pts(STR, [[10, 31], [11, 31], [12, 32], [10, 35], [11, 35], [33, 31], [34, 31], [32, 32], [33, 35], [34, 35]]);
+      b.pts(STR, [[12, 30], [13, 30], [12, 32], [32, 30], [31, 30], [32, 32]]);
     });
+    if (!wave) legs.push(19);
+    if (!groom) legs.push(25);
+    legs.forEach(function (x) { P.layer(function (b) { limb(b, x, 30, x, 38.5, 2.5, FUR); }, 34); }); // front legs grow out of the chest
+    P.out.sq(22, 29.5, 5.2, 5.6, WHT, 2, [FUR]); // cream chest painted over the leg tops
     faceDraw(P.out, 0, -br, o); accHead(P.out, o.acc, 0, -br);
-    if (raiseL) P.layer(function (b) { var up = f ? 4 : 0; limb(b, 14, 31, 9, 24 - up, 2.2, FUR); mitten(b, 8, 22 - up, 3.3, 3, false); b.s(8, 25 - up, WSH); });
-    if (raiseR) P.layer(function (b) { limb(b, 31, 32, 29.5, 27 - f, 2.2, FUR); mitten(b, 28, 24.5 - f, 3.4, 2.9, false); b.s(28, 27 - f, WSH); });
+    bean(P, 10.5, 40.8, 3, 1.7); bean(P, 33.5, 40.8, 3, 1.7);
+    legs.forEach(function (x) { bean(P, x, 40.4, 3.4, 1.9); });
+    if (wave) { // short thick arm, paw up by the cheek showing its pads
+      var up = f ? 3 : 0;
+      P.layer(function (b) { limb(b, 13.5, 33, 11, 29 - up, 2.5, FUR); });
+      sole(P, 9.5, 26 - up);
+    }
+    if (groom) { // paw up at the cheek, tongue on frame 1
+      P.layer(function (b) { limb(b, 30.5, 35, 30, 28, 2.5, FUR); });
+      P.layer(function (b) { b.sq(29, 24.6 - f, 3.2, 2.6, WHT); });
+      if (f) P.out.pts(PNK, [[25, 23 - br], [25, 22 - br]]);
+    }
     return P.res(22, 41, 0, -br);
   }
 
@@ -239,11 +284,11 @@
       tailDraw(b, [[36, 40], [40.5, 39.5], [43, 36.5], [42.5 + tw, 33 - tw]], 1.7);
       b.sq(22, 33, 17.5, 8.2, FUR, 2.4);
       b.sq(22, 34.5, 5.5, 5, WHT, 2, [FUR]);
-      b.sq(15.5, 40.5, 3.2, 1.8, WHT); b.sq(28.5, 40.5, 3.2, 1.8, WHT);
       headBase(b, 0, 3 - br, o);
       b.pts(STR, [[8, 36], [9, 36], [10, 37], [35, 36], [36, 36], [34, 37], [6, 33], [7, 33], [37, 33], [38, 33]]);
     });
     faceDraw(P.out, 0, 3 - br, o); accHead(P.out, o.acc, 0, 3 - br);
+    bean(P, 15.5, 40.5, 3.2, 1.8); bean(P, 28.5, 40.5, 3.2, 1.8);
     return P.res(22, 41, 0, 3 - br);
   }
 
@@ -252,13 +297,17 @@
     P.layer(function (b) { tailDraw(b, [[5, 34.5], [0.5, 36.5], [-3.5, 36.8], [-7, 35 - tw * 1.5]], 1.7); });
     P.layer(function (b) {
       b.sq(18, G - ry + 0.5, 17, ry, FUR, 2.2);
-      b.sq(20, G - 2, 12.5, 2.6, WHT, 2, [FUR]);
-      b.sq(5.5, G - 1.2, 3.6, 1.9, WHT);
-      bands(b, 3, G - 19, 24, G - 8, 8, 2, 1);
+      b.sq(21, G - 2, 11.5, 2.4, WHT, 2, [FUR]);
+      bands(b, 3, G - 19, 26, G - 8, 8, 2, 1);
     });
+    arc(P, 9.5, 30.5, 6.5, 6, -110, 75, OUT); arc(P, 9.5, 30.5, 3.8, 3.4, -100, -10, STR); // thigh = a curved line
+    bean(P, 16, G - 1.4, 3.2, 1.6); // hind foot tucked forward
     P.head(hx, hy, o);
-    P.layer(function (b) { mitten(b, 36, G - 1.8, 4, 2.6, false); });
-    P.layer(function (b) { mitten(b, 46 + pt, G - 1.8 - pt, 4, 2.6, false); });
+    [34.5, 41].forEach(function (x, i) { // forearms reach out under the chin; pt twitches the second paw
+      var t = i ? pt : 0;
+      P.layer(function (b) { limb(b, x - 7, G - 2.8, x - 2 + t, G - 2.8 - t, 2.3, FUR); });
+      bean(P, x + t, G - 1.5 - t, 3, 1.8);
+    });
     return P.res(26, G, hx, hy);
   }
 
@@ -271,16 +320,20 @@
       b.pts(BEL2, [[20, 40], [21, 40], [24, 43]]);
       b.pts(STR, [[8, 36], [9, 36], [8, 38], [36, 36], [35, 36], [36, 38]]);
     });
-    function leg(ax, ay, bx, by, px, py) { P.layer(function (b) { limb(b, ax, ay, bx, by, 2.4, FUR); mitten(b, px, py, 3.5, 3.2, false); b.s(px, py + 3, WSH); }); }
-    var w = wg ? 1 : -1;
-    if (hug) {
-      leg(12, 31, 18, 33, 18.5, 33.5); leg(32, 31, 26, 33, 25.5, 33.5);
-      leg(13, 43, 8, 36 - wg * 2, 7.5, 34 - wg * 2); leg(31, 43, 37, 36 - (1 - wg) * 2, 37.5, 34 - (1 - wg) * 2);
-    } else {
-      leg(12, 30, 6, 25 + w, 5.5, 23 + w); leg(32, 30, 38, 25 - w, 38.5, 23 - w);
-      leg(13, 43, 7 - w, 37, 6.5 - w, 35); leg(31, 43, 37 + w, 37, 37.5 + w, 35);
-    }
+    var w = wg ? 1 : 0; // wiggle: arms and soles move 1px
+    P.layer(function (b) { b.sq(10.5 - w, 44.5, 5.2, 4.6, FUR); b.sq(33.5 + w, 44.5, 5.2, 4.6, FUR); }); // bent hind legs
+    sole(P, 8.5 - w, 41.5); sole(P, 36.5 + w, 41.5); // soles up
     P.head(hx, hy, { expr: o.expr, ear: o.ear, mo: o.mo, acc: o.acc, pose: 'bellyUp' });
+    [1, -1].forEach(function (sx) {
+      var ay = sx > 0 ? w : -w;
+      if (hug) { // both paws meet just above the belly centre
+        P.layer(function (b) { limb(b, 22 - sx * 11, 30.5, 22 - sx * 6, 32.6, 2.5, FUR); });
+        bean(P, 22 - sx * 3.3, 32.8, 2.8, 1.7);
+      } else {
+        P.layer(function (b) { limb(b, 22 - sx * 11, 30.5, 22 - sx * 13.5, 27 + ay, 2.6, FUR); });
+        sole(P, 22 - sx * 14.5, 24.5 + ay);
+      }
+    });
     return P.res(22, G, hx, hy, { belly: { x: 11 + 7, y: 28 + 5, w: 22, h: 18 } });
   }
 
@@ -290,8 +343,8 @@
     var hx = 12, hy = 10, tail, legs, far, near, shape = 'std', rump = o.rump || 0;
     if (mode === 'walk') {
       var a = [3, 0, -3, 0][f], lA = f === 1 ? 2 : 0, lB = f === 3 ? 2 : 0; dy = (f % 2) ? -1 : 0;
-      far = [[26 - a, G - 2 - lB, 26 - a, 38], [10 + a, G - 2 - lB, 10 + a, 38]];
-      near = [[10 - a, G - 2 - lA, 10 - a, 38], [28 + a, G - 2 - lA, 28 + a, 38]];
+      far = [[26 - a, G - 2 - lB, 26 - a, 38 + dy], [10 + a, G - 2 - lB, 10 + a, 38 + dy]];
+      near = [[10 - a, G - 2 - lA, 10 - a, 38 + dy], [28 + a, G - 2 - lA, 28 + a, 38 + dy]];
       tail = [[4, 30 + dy], [0, 27 + dy], [-2, 21 + dy], [-1.5 + tw, 15 + dy], [0.5 + tw, 13 + dy]]; hy = 10 + dy; by = 30 + dy;
     } else if (mode === 'eat') {
       var c = o.chew ? 1 : 0; hx = 14; hy = 14 + c;
@@ -301,17 +354,16 @@
       by = 34; hx = 11; hy = 14 + 0; shape = 'low';
       far = [[26, G - 2, 26, 40], [12 + rump, G - 2, 12 + rump, 40]]; near = [[31, G - 2, 31, 40], [7 + rump, G - 2, 7 + rump, 40]];
       tail = [[4 + rump, 37], [-2 + rump, 38], [-7 + rump, 36 - tw], [-10 + rump, 33 - tw]];
-    } else if (mode === 'leap') {
-      by = 28; hx = 15; hy = 6; shape = 'long';
-      far = [[40, 22, 30, 28], [-3, 33, 8, 33]]; near = [[44, 27, 31, 30], [-6, 38, 7, 35]];
-      tail = [[3, 27], [-3, 27], [-9, 29], [-14, 27]];
     } else { // bow
       shape = 'bow'; hx = 14; hy = 14;
       far = [[44, G - 2, 28, 40], [14, G - 2, 14, 36]]; near = [[46, G - 1.5, 30, 41], [8, G - 2, 8, 36]];
       tail = [[3, 22], [0, 16], [-1, 10], [0.5 + tw, 6]];
     }
-    function legL(set, isFar) {
-      P.layer(function (b) { set.forEach(function (l) { limb(b, l[2], l[3], l[0], l[1], 1.9, isFar ? STR : FUR); mitten(b, l[0] + 0.5, l[1] + 0.8, 3.3, 2.4, isFar); }); });
+    function legL(set, isFar) { // stubby r2.5 leg + bean paw; near legs are cut so they grow out of the body
+      set.forEach(function (l) {
+        P.layer(function (b) { limb(b, l[2], l[3] - 2, l[0], l[1] - 1, 2.5, isFar ? STR : FUR); }, isFar ? null : l[3] - 1);
+        bean(P, l[0] + 0.5, l[1] + 0.3, 3, 1.7, isFar);
+      });
     }
     P.layer(function (b) { tailDraw(b, tail, 1.7); });
     legL(far, true);
@@ -327,10 +379,26 @@
         b.sq(bx, by, 15, 9.5, FUR, 2.2); b.sq(bx + 2, by + 8, 10.5, 2.6, WHT, 2, [FUR]); bands(b, 3, by - 10, 26, by + 3, 8, 2, 1);
       }
     });
+    thigh(P, mode === 'bow' ? 10 : 10, mode === 'bow' ? 29 : by + 1.5);
     legL(near, false);
     var oo = { expr: o.expr, ear: o.ear, mo: o.mo, acc: o.acc, pose: o.pose };
     P.head(hx, hy, oo);
     return P.res(bx + 3, G, hx, hy);
+  }
+
+  function poseLeap(o) {
+    var P = new Pose(80, 56, 10, 5), G = 44, by = 28, hx = 15, hy = 6;
+    P.layer(function (b) { tailDraw(b, [[3, 27], [-3, 27], [-9, 29], [-14, 27]], 1.7); });
+    P.layer(function (b) { limb(b, 27, 31, 33, 34, 2.4, STR); }); bean(P, 34.5, 34.6, 3, 1.7, true);
+    P.layer(function (b) { limb(b, 9, 32, 4, 35, 2.4, STR); }); bean(P, 2.5, 35.6, 3, 1.7, true);
+    P.layer(function (b) {
+      b.sq(18, by, 17, 8.3, FUR, 2.2); b.sq(20, by + 6, 11, 2.2, WHT, 2, [FUR]); bands(b, 3, by - 9, 24, by + 3, 8, 2, 1);
+    });
+    thigh(P, 9, by + 1);
+    P.layer(function (b) { limb(b, 7, 33, 1, 37, 2.5, FUR); }, 35); bean(P, -0.5, 37.6, 3, 1.7);
+    P.head(hx, hy, { expr: o.expr, ear: o.ear, mo: o.mo, acc: o.acc, pose: o.pose });
+    P.layer(function (b) { limb(b, 30, 32, 37, 36, 2.5, FUR); }); bean(P, 38.5, 36.6, 3, 1.7);
+    return P.res(21, G, hx, hy);
   }
 
   function poseCurl(o) {
@@ -342,7 +410,7 @@
     });
     P.layer(function (b) { tailDraw(b, [[49, 33], [47, 39.5], [40, 42], [33, 41.5], [28 + tw, 39.5]], 1.9); });
     P.head(hx, hy, { expr: 'sleep', ear: o.ear, acc: o.acc, pose: 'curl' });
-    P.layer(function (b) { mitten(b, 14, G - 1.2, 3.4, 2, false); mitten(b, 23, G - 1.2, 3.4, 2, false); });
+    bean(P, 14, G - 1.2, 3.4, 2); bean(P, 23, G - 1.2, 3.4, 2);
     return P.res(27, G, hx, hy);
   }
 
@@ -353,7 +421,7 @@
     var hy = P0 - 1 - rows;
     if (vis) {
       P.head(C - 22, hy, { expr: o.expr, ear: o.ear, acc: o.acc, pose: 'inBox' });
-      if (rows > 20) P.layer(function (b) { mitten(b, C - 13, P0 - 1, 3.4, 2.2, false); mitten(b, C + 13, P0 - 1, 3.4, 2.2, false); });
+      if (rows > 20) { bean(P, C - 13, P0 - 1, 3.4, 2.2); bean(P, C + 13, P0 - 1, 3.4, 2.2); }
     }
     P.layer(function (b) {
       b.rect(C - 21, P0, 43, PB - P0, 37);
@@ -373,7 +441,7 @@
       case 'walk': o.mode = 'walk'; return poseSide(o);
       case 'eat': o.mode = 'eat'; return poseSide(o);
       case 'crouch': o.mode = 'crouch'; return poseSide(o);
-      case 'leap': o.mode = 'leap'; return poseSide(o);
+      case 'leap': return poseLeap(o);
       case 'stretch': o.mode = 'bow'; return poseSide(o);
       case 'groom': o.paw = 'groom' + (s.f ? 1 : 0); return poseSit(o);
       case 'bat': o.paw = 'bat' + (s.f ? 1 : 0); return poseSit(o);
