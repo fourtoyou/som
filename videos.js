@@ -277,5 +277,86 @@ window.SOM_VIDEOS = [
   "h": 1024,
   "dur": 19.3,
   "caption": "นอนหงายผ่อนคลายข้างพัดลม"
+ },
+ {
+  "id": "v32",
+  "src": "videos/v32.mp4",
+  "poster": "videos/v32.jpg",
+  "w": 576,
+  "h": 1024,
+  "dur": 65.2,
+  "caption": "นอนเหยียดขายาวหน้าประตูไม้"
+ },
+ {
+  "id": "v33",
+  "src": "videos/v33.mp4",
+  "poster": "videos/v33.jpg",
+  "w": 576,
+  "h": 1024,
+  "dur": 28.3,
+  "caption": "นั่งมองม่านขาวริมที่นอน"
+ },
+ {
+  "id": "v34",
+  "src": "videos/v34.mp4",
+  "poster": "videos/v34.jpg",
+  "w": 368,
+  "h": 656,
+  "dur": 23.0,
+  "caption": "เดินมาคลอเคลียข้างพัดลม"
+ },
+ {
+  "id": "v35",
+  "src": "videos/v35.mp4",
+  "poster": "videos/v35.jpg",
+  "w": 576,
+  "h": 1024,
+  "dur": 17.3,
+  "caption": "งีบบนเบาะนุ่มลายการ์ตูน"
+ },
+ {
+  "id": "v36",
+  "src": "videos/v36.mp4",
+  "poster": "videos/v36.jpg",
+  "w": 640,
+  "h": 368,
+  "dur": 61.0,
+  "caption": "นอนตะแคงสบายบนผ้าปูลายจุด"
+ },
+ {
+  "id": "v37",
+  "src": "videos/v37.mp4",
+  "poster": "videos/v37.jpg",
+  "w": 576,
+  "h": 1024,
+  "dur": 56.3,
+  "caption": "เล่นเชือกสีน้ำเงินสนุกเชียว"
+ },
+ {
+  "id": "v38",
+  "src": "videos/v38.mp4",
+  "poster": "videos/v38.jpg",
+  "w": 368,
+  "h": 656,
+  "dur": 17.4,
+  "caption": "นั่งหน้าประตู ร้องขอให้เปิดให้"
+ },
+ {
+  "id": "v39",
+  "src": "videos/v39.mp4",
+  "poster": "videos/v39.jpg",
+  "w": 576,
+  "h": 1024,
+  "dur": 56.2,
+  "caption": "นอนกลิ้งบนพื้นขาว สบายพุง"
+ },
+ {
+  "id": "v40",
+  "src": "videos/v40.mp4",
+  "poster": "videos/v40.jpg",
+  "w": 576,
+  "h": 1024,
+  "dur": 77.7,
+  "caption": "ซุกผ้าชมพูนุ่ม ๆ สบายใจ"
  }
 ];

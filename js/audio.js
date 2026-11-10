@@ -1,4 +1,4 @@
-/* audio.js - WebAudio synth only. No files, no network. Safe when AudioContext is missing. */
+/* audio.js - everything is WebAudio synth except the meow: that is a real recording of ส้ม (audio/meow1-4.mp3). Safe when AudioContext is missing. */
 (function (root) {
   'use strict';
   var ctx = null, master = null, enabled = true, purrG = null, purrOn = false, noiseBuf = null;
@@ -45,20 +45,22 @@
       setTimeout(function () { try { n.s.stop(); n.lfo.stop(); } catch (e) {} }, 900);
     }
   }
-  // No synthesized voice. If audio/meow.mp3 is ever added it plays; if missing it stays silent (tried once, no retry spam).
-  var HAS_MEOW = false; // flip to true only when audio/meow.mp3 is added; keeps the site from requesting a missing file
+  // The meow is a real recording of ส้ม: one of audio/meow1..4.mp3 each time. Never synthesized.
+  var HAS_MEOW = true, MEOWS = 4;
   var meowEl = null, meowBad = false;
   function meow() {
     if (!HAS_MEOW || !enabled || meowBad) return;
     try {
       if (!meowEl) {
-        meowEl = new Audio(); meowEl.preload = 'none'; meowEl.preservesPitch = false; meowEl.volume = 0.8;
-        meowEl.addEventListener('error', function () { meowBad = true; });
-        meowEl.src = 'audio/meow.mp3';
+        meowEl = new Audio(); meowEl.preload = 'auto'; meowEl.preservesPitch = false; meowEl.volume = 0.8;
+        meowEl.addEventListener('error', function () { meowBad = true; }); // file missing/undecodable: stop trying
       }
+      meowEl.src = 'audio/meow' + (1 + Math.floor(Math.random() * MEOWS)) + '.mp3';
       meowEl.playbackRate = 0.94 + Math.random() * 0.12; meowEl.currentTime = 0;
-      var p = meowEl.play(); if (p && p.catch) p.catch(function () { meowBad = true; });
-    } catch (e) { meowBad = true; }
+      var p = meowEl.play();
+      // autoplay block (NotAllowedError) or an interrupted load (AbortError) is not a broken file: do not mute him for the visit
+      if (p && p.catch) p.catch(function (e) { if (e && e.name === 'NotSupportedError') meowBad = true; });
+    } catch (e) { if (e && e.name === 'NotSupportedError') meowBad = true; }
   }
   root.SomAudio = {
     init: init, setEnabled: setEnabled, isEnabled: function () { return enabled; }, purr: purr, meow: meow,
