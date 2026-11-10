@@ -51,7 +51,7 @@
   };
   function rndOf(a) { return a[Math.floor(Math.random() * a.length)]; }
   function catAnchor() { return Cat.headTop(); }
-  function say(t, ms) { UI.say(t, catAnchor, ms); }
+  function say() {} // the family asked for no speech bubbles: ส้ม doesn't talk (meow face + hearts stay)
   Cat.onBubble = function (k) { if (LINES[k]) say(rndOf(LINES[k])); };
   function greeting() {
     var n = NAME();
@@ -71,7 +71,7 @@
 
   /* ---------- hint hand ---------- */
   var hintOn = false;
-  function showHint() { if (state.hints.pet || (DEMO && DEMO !== 'hint')) return; hintOn = true; $('hint').hidden = false; UI.say('ลองลูบหัวส้มดูสิ', catAnchor, 600000); }
+  function showHint() { if (state.hints.pet || (DEMO && DEMO !== 'hint')) return; hintOn = true; $('hint').hidden = false; }
   function hideHint() { if (!hintOn) return; hintOn = false; $('hint').hidden = true; UI.hideBubble(); }
   function placeHint() { if (!hintOn) return; var p = Cat.headTop(); var h = $('hint'); h.style.left = (p.x * cssScale) + 'px'; h.style.top = (p.y * cssScale + 9 * cssScale) + 'px'; }
 
