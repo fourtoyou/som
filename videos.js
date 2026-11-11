@@ -358,5 +358,14 @@ window.SOM_VIDEOS = [
   "h": 1024,
   "dur": 77.7,
   "caption": "ซุกผ้าชมพูนุ่ม ๆ สบายใจ"
+ },
+ {
+  "id": "v41",
+  "src": "videos/v41.mp4",
+  "poster": "videos/v41.jpg",
+  "w": 574,
+  "h": 1170,
+  "dur": 22.4,
+  "caption": "เดินมาหา แล้วปีนขึ้นแคร่"
  }
 ];

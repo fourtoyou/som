@@ -2134,5 +2134,69 @@ window.SOM_PHOTOS = [
   "w": 720,
   "h": 960,
   "caption": "เดินไปทางผ้าสีม่วง หางชี้ตั้ง"
+ },
+ {
+  "id": "268",
+  "src": "photos/268.jpg",
+  "thumb": "photos/thumbs/268.jpg",
+  "w": 960,
+  "h": 723,
+  "caption": "เอียงหัวมองบนแคร่ไม้ ตาแป๋ว"
+ },
+ {
+  "id": "269",
+  "src": "photos/269.jpg",
+  "thumb": "photos/thumbs/269.jpg",
+  "w": 473,
+  "h": 960,
+  "caption": "นอนเล่นนอกบ้าน ข้างสายยางสีเขียว"
+ },
+ {
+  "id": "270",
+  "src": "photos/270.jpg",
+  "thumb": "photos/thumbs/270.jpg",
+  "w": 473,
+  "h": 960,
+  "caption": "นอนหงายโชว์พุงกลม ๆ"
+ },
+ {
+  "id": "271",
+  "src": "photos/271.jpg",
+  "thumb": "photos/thumbs/271.jpg",
+  "w": 723,
+  "h": 960,
+  "caption": "นอนข้างพัดลม เงยหน้ามองอ้อน ๆ"
+ },
+ {
+  "id": "272",
+  "src": "photos/272.jpg",
+  "thumb": "photos/thumbs/272.jpg",
+  "w": 473,
+  "h": 960,
+  "caption": "นอนหมอบ หรี่ตาข้างเดียว"
+ },
+ {
+  "id": "273",
+  "src": "photos/273.jpg",
+  "thumb": "photos/thumbs/273.jpg",
+  "w": 723,
+  "h": 960,
+  "caption": "หลับหงายท้องบนที่นอน สบายใจ"
+ },
+ {
+  "id": "274",
+  "src": "photos/274.jpg",
+  "thumb": "photos/thumbs/274.jpg",
+  "w": 723,
+  "h": 960,
+  "caption": "นอนแผ่หันหลัง ขาแบะ ก้นกลม"
+ },
+ {
+  "id": "275",
+  "src": "photos/275.jpg",
+  "thumb": "photos/thumbs/275.jpg",
+  "w": 473,
+  "h": 960,
+  "caption": "หลับยาวบนพื้นหน้าชั้นทีวี"
  }
 ];
