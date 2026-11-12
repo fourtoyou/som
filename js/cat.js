@@ -7,7 +7,8 @@
   var BASE = { sit: 'open', loaf: 'open', lieSide: 'sleep', curl: 'sleep', bellyUp: 'sleep', walk: 'open', eat: 'happy', crouch: 'open', leap: 'open', stretch: 'meow', groom: 'sleep', bat: 'open', inBox: 'open' };
   var SHADOW = { sit: 28, loaf: 32, lieSide: 40, bellyUp: 32, walk: 36, eat: 36, crouch: 36, leap: 30, stretch: 36, groom: 28, bat: 28 };
   function rr(a, b) { return a + Math.random() * (b - a); }
-  function pick(w) { var r = Math.random(), s = 0; for (var i = 0; i < w.length; i++) { s += w[i][0]; if (r < s) return w[i][1]; } return w[w.length - 1][1]; }
+  // w = [[cumulative threshold, plan], ...] ending at 1: [[0.3, a], [1, b]] = a 30%, b 70%
+  function pick(w) { var r = Math.random(); for (var i = 0; i < w.length; i++) if (r < w[i][0]) return w[i][1]; return w[w.length - 1][1]; }
 
   var Cat = {
     x: 62, y: 128, dir: 1, lift: 0, time: 0, phase: 'day', hour: 12, acc: { head: null, neck: null },
@@ -45,12 +46,11 @@
   // garden: by day a mix of pot / hose / grass; at night asleep in the moonlight unless he was woken
   function gardenAct(phase) {
     if (phase === 'night') return Cat.time < Cat.awakeUntil ? awakeNight() : [goto_(P.gsleep.x, P.gsleep.y), hold({ pose: 'curl' }, Infinity)];
-    // pick() sums these, so they are real weights (total 1)
     return pick([[0.25, [goto_(P.pot.x, P.pot.y), hold({ pose: 'sit', look: 1 }, rr(10000, 18000))]],
-      [0.25, [goto_(P.hose.x, P.hose.y), hold({ pose: 'lieSide' }, rr(15000, 25000))]],
-      [0.15, [goto_(rr(58, 82), rr(P.center.y - 14, P.center.y + 4)), hold({ pose: 'bellyUp' }, rr(10000, 16000))]],
-      [0.12, [hold({ pose: 'loaf' }, rr(10000, 16000))]],
-      [0.1, [hold({ pose: 'groom' }, rr(7000, 10000))]], [0.13, wander()]]);
+      [0.5, [goto_(P.hose.x, P.hose.y), hold({ pose: 'lieSide' }, rr(15000, 25000))]],
+      [0.65, [goto_(rr(58, 82), rr(P.center.y - 14, P.center.y + 4)), hold({ pose: 'bellyUp' }, rr(10000, 16000))]],
+      [0.77, [hold({ pose: 'loaf' }, rr(10000, 16000))]],
+      [0.87, [hold({ pose: 'groom' }, rr(7000, 10000))]], [1, wander()]]);
   }
   function actFor(phase, hour) {
     var spot;
