@@ -260,7 +260,7 @@
   /* ---------- poses ---------- */
   function poseSit(o) {
     var br = o.br ? 1 : 0, tw = o.tw ? 1 : 0, paw = o.paw || '', P = new Pose(60, 54, 7, 7);
-    var wave = paw.indexOf('bat') === 0, groom = paw.indexOf('groom') === 0, f = /1$/.test(paw) ? 1 : 0, legs = [];
+    var wave = paw.indexOf('bat') === 0, groom = paw.indexOf('groom') === 0, scr = paw.indexOf('scratch') === 0, f = /1$/.test(paw) ? 1 : 0, legs = [];
     P.layer(function (b) { tailDraw(b, [[30, 39.2], [33.5, 39.8], [37, 39.6], [39.6, 38.2], [40.8 + tw * 0.8, 35.8 - tw], [40.2 + tw * 1.2, 33.6 - tw * 1.4]], 2.0); });
     P.layer(function (b) {
       b.sq(22, 32.5, 11, 9, FUR, 2.2);
@@ -287,6 +287,12 @@
       var up = f ? 3 : 0;
       P.layer(function (b) { limb(b, 13.5, 33, 11, 29 - up, 2.5, FUR); });
       sole(P, 9.5, 26 - up);
+    }
+    if (scr) { // right hind leg comes up out of the haunch, foot swings at the cheek/ear (2 frames)
+      var sc = f ? 3 : 0;
+      P.layer(function (b) { limb(b, 33.5, 37, 35 - sc * 0.3, 28 - sc, 2.7, FUR); }, 33);
+      P.layer(function (b) { b.sq(35 - sc * 0.3, 25.2 - sc, 3, 2.4, WHT); });
+      P.out.pts(STR, [[35, 35], [36, 33]]);
     }
     if (groom) { // paw up at the cheek, tongue on frame 1
       P.layer(function (b) { limb(b, 30.5, 35, 30, 28, 2.5, FUR); });
@@ -462,6 +468,7 @@
       case 'leap': return poseLeap(o);
       case 'stretch': o.mode = 'bow'; return poseSide(o);
       case 'groom': o.paw = 'groom' + (s.f ? 1 : 0); return poseSit(o);
+      case 'scratch': o.paw = 'scratch' + (s.f ? 1 : 0); return poseSit(o);
       case 'bat': o.paw = 'bat' + (s.f ? 1 : 0); return poseSit(o);
       case 'inBox': return poseBox(o);
       default: return BUILD[s.pose](o);
