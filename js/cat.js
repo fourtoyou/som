@@ -19,14 +19,42 @@
   /* ---------- scripts ---------- */
   function goto_(x, y) { return { t: 'goto', x: x, y: y }; }
   function hold(o, ms) { o.t = 'hold'; o.ms = ms; return o; }
+  function inNogo(x, y, pad) {
+    var a = R.nogo(), i, r;
+    for (i = 0; i < a.length; i++) { r = a[i]; if (x >= r.x - pad && x <= r.x + r.w + pad && y >= r.y - pad && y <= r.y + r.h + pad) return true; }
+    return false;
+  }
+  // a floor point that is not on a prop (the garden hose): pushed up above the prop if it is on one
+  Cat.avoid = function (x, y) {
+    var a = R.nogo(), i, r; x = Math.max(F.x0, Math.min(F.x1, x)); y = Math.max(F.y0, Math.min(F.y1, y));
+    for (i = 0; i < a.length; i++) { r = a[i]; if (inNogo(x, y, 6)) y = Math.max(F.y0, r.y - 8); }
+    return { x: x, y: y };
+  };
   function wander() {
-    var x = rr(F.x0, F.x1), y = rr(F.y0 + 6, F.y1);
+    var x = rr(F.x0, F.x1), y = rr(F.y0 + 6, F.y1), k = 0;
+    if (R.scene() === 'garden') {
+      while (inNogo(x, y, 6) && k++ < 20) { x = rr(F.x0, F.x1); y = rr(F.y0 + 6, F.y1); }
+      if (inNogo(x, y, 6)) { x = P.center.x; y = P.center.y; }
+      return [goto_(x, y), hold({ pose: 'sit' }, rr(5000, 9000))];
+    }
     if (x > 92 && y < 112) y = rr(114, F.y1);
     if (x < 72 && y > P.bed.y - 32) y = rr(F.y0 + 6, P.bed.y - 32); // keep out of the (bigger) bed
     return [goto_(x, y), hold({ pose: 'sit' }, rr(5000, 9000))];
   }
+  function awakeNight() { return pick([[0.4, [hold({ pose: 'sit' }, rr(8000, 12000))]], [0.7, [hold({ pose: 'groom' }, 7000)]], [1, [hold({ pose: 'stretch' }, 3000), hold({ pose: 'sit' }, 5000)]]]); }
+  // garden: by day a mix of pot / hose / grass; at night asleep in the moonlight unless he was woken
+  function gardenAct(phase) {
+    if (phase === 'night') return Cat.time < Cat.awakeUntil ? awakeNight() : [goto_(P.gsleep.x, P.gsleep.y), hold({ pose: 'curl' }, Infinity)];
+    // pick() sums these, so they are real weights (total 1)
+    return pick([[0.25, [goto_(P.pot.x, P.pot.y), hold({ pose: 'sit', look: 1 }, rr(10000, 18000))]],
+      [0.25, [goto_(P.hose.x, P.hose.y), hold({ pose: 'lieSide' }, rr(15000, 25000))]],
+      [0.15, [goto_(rr(58, 82), rr(P.center.y - 14, P.center.y + 4)), hold({ pose: 'bellyUp' }, rr(10000, 16000))]],
+      [0.12, [hold({ pose: 'loaf' }, rr(10000, 16000))]],
+      [0.1, [hold({ pose: 'groom' }, rr(7000, 10000))]], [0.13, wander()]]);
+  }
   function actFor(phase, hour) {
     var spot;
+    if (R.scene() === 'garden') return gardenAct(phase);
     switch (phase) {
       case 'dawn':
         return pick([[0.3, [hold({ pose: 'groom' }, rr(7000, 10000))]],
@@ -45,7 +73,7 @@
         return pick([[0.35, [goto_(P.center.x, P.center.y), hold({ pose: 'sit', look: 1 }, rr(10000, 18000))]],
           [0.6, [hold({ pose: 'groom' }, rr(7000, 10000))]], [0.85, wander()], [1, [hold({ pose: 'loaf' }, rr(9000, 14000))]]]);
       default: // night
-        if (Cat.time < Cat.awakeUntil) return pick([[0.4, [hold({ pose: 'sit' }, rr(8000, 12000))]], [0.7, [hold({ pose: 'groom' }, 7000)]], [1, [hold({ pose: 'stretch' }, 3000), hold({ pose: 'sit' }, 5000)]]]);
+        if (Cat.time < Cat.awakeUntil) return awakeNight();
         return [goto_(P.bed.x, P.bed.y), hold({ pose: 'curl' }, Infinity)];
     }
   }
@@ -56,6 +84,12 @@
   Cat.reset = function (phase, hour) {
     Cat.phase = phase; Cat.hour = hour; Cat.busy = false; Cat.ov = null; Cat.awakeUntil = 0;
     var sp = R.beamSpot(hour), plan;
+    if (R.scene() === 'garden') { // first frame in the garden (?garden=1)
+      if (phase === 'night') { Cat.x = P.gsleep.x; Cat.y = P.gsleep.y; plan = [hold({ pose: 'curl' }, Infinity)]; }
+      else if (phase === 'day' || phase === 'morning') { Cat.x = P.hose.x; Cat.y = P.hose.y; plan = [hold({ pose: 'lieSide' }, rr(15000, 25000))]; }
+      else { Cat.x = P.pot.x; Cat.y = P.pot.y; plan = [hold({ pose: 'sit', look: 1 }, 12000)]; }
+      Cat.run(plan); return;
+    }
     if (phase === 'morning') { Cat.x = sp.x; Cat.y = sp.y; plan = [hold({ pose: 'lieSide', say: 'sun' }, rr(15000, 25000))]; }
     else if (phase === 'day') { Cat.x = P.fan.x; Cat.y = P.fan.y; plan = [hold({ pose: 'lieSide', expr: 'open', say: 'fan' }, rr(14000, 25000))]; }
     else if (phase === 'night') { Cat.x = P.bed.x; Cat.y = P.bed.y; plan = [hold({ pose: 'curl' }, Infinity)]; }
@@ -63,6 +97,8 @@
     else { Cat.x = 82; Cat.y = 142; plan = [hold({ pose: 'sit' }, 12000)]; }
     Cat.run(plan);
   };
+  // after the scene changed: back onto this scene's floor and off its props, then pick a fitting activity
+  Cat.fit = function () { var p = Cat.avoid(Cat.x, Cat.y); Cat.x = p.x; Cat.y = p.y; Cat.interrupt(); };
   Cat.setPhase = function (phase, hour) { Cat.hour = hour; if (phase !== Cat.phase) { Cat.phase = phase; Cat.interrupt(); } };
 
   function begin(s) {

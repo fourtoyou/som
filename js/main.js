@@ -3,6 +3,7 @@
   'use strict';
   var S = SomState, R = SomRoom, Cat = SomCat, Fx = SomFx, A = SomAudio, IC = SomIcons, SP = SomSprites, UI = SomUI, $ = UI.$, el = UI.el;
   var Q = new URLSearchParams(location.search), DEMO = Q.get('demo') || '', DEBUG = Q.get('debug') === '1', PQ = Q.get('phase');
+  var scene = Q.get('garden') === '1' ? 'garden' : 'house', sw = null; // scene is never saved: the game always opens in the house (?garden=1 is a test override); sw = fade in progress
   var HOURS = { dawn: 6, morning: 9, day: 13, evening: 17, night: 22 };
   if (PQ && !HOURS[PQ]) PQ = null;
   if (!PQ && Q.get('night') === '1') PQ = 'night'; else if (!PQ && Q.get('night') === '0') PQ = 'day'; // test override
@@ -18,6 +19,8 @@
   function dirty() { if (!saveT) saveT = setTimeout(save, 1000); }
   document.addEventListener('visibilitychange', function () { if (document.hidden) { save(); A.purr(false); } });
   window.addEventListener('pagehide', save);
+
+  R.setScene(scene);
 
   /* ---------- time & phase ---------- */
   function hourNow() { return PQ ? HOURS[PQ] : new Date().getHours(); }
@@ -201,7 +204,7 @@
     if (Cat.step && Cat.step.pose === 'crouch' || Cat.step && Cat.step.t === 'leap' || Cat.step && Cat.step.t === 'call') return;
     if (d > 46) {
       w.hover = 0; w.retarget = (w.retarget || 0) - dt;
-      if (w.retarget <= 0 || !Cat.isWalking()) { w.retarget = 0.7; Cat.run([{ t: 'goto', x: gx - Math.sign(gx - Cat.x) * 30, y: gy, speed: 28 }, { t: 'hold', pose: 'sit', expr: 'open', ms: Infinity }], true); }
+      if (w.retarget <= 0 || !Cat.isWalking()) { w.retarget = 0.7; Cat.run([Object.assign({ t: 'goto', speed: 28 }, Cat.avoid(gx - Math.sign(gx - Cat.x) * 30, gy)), { t: 'hold', pose: 'sit', expr: 'open', ms: Infinity }], true); }
     } else {
       if (Cat.isWalking() && d < 38) Cat.run([{ t: 'hold', pose: 'sit', expr: 'open', ms: Infinity }], true);
       if (Math.abs(w.x - Cat.x) > 4) Cat.dir = w.x > Cat.x ? 1 : -1;
@@ -213,7 +216,7 @@
     wand.cool = 2.8; wand.hover = 0;
     var dir = gx >= Cat.x ? 1 : -1; Cat.dir = dir;
     Cat.run([{ t: 'hold', pose: 'crouch', dir: dir, ms: 520 },
-      { t: 'leap', x: gx - dir * 6, y: clamp(gy, R.FLOOR.y0, R.FLOOR.y1), ms: 360, h: 12 },
+      Object.assign({ t: 'leap', ms: 360, h: 12 }, Cat.avoid(gx - dir * 6, clamp(gy, R.FLOOR.y0, R.FLOOR.y1))),
       { t: 'call', fn: function () { giveHearts(3, Cat.x, Cat.y - 22); A.pop(); A.meow(); say(Math.random() < 0.5 ? 'จับได้!' : 'เมี้ยว!', 1300); } },
       { t: 'hold', pose: 'sit', expr: 'open', ms: 700 },
       { t: 'hold', pose: 'sit', expr: 'open', ms: Infinity }], true);
@@ -413,6 +416,20 @@
   $('motdClose').addEventListener('click', function () { A.blip(); closeMotd(); });
   $('motdAll').addEventListener('click', function () { A.blip(); closeMotd(); openMem(0); });
 
+  /* ---------- house <-> garden ---------- */
+  function sceneLabel() { var b = $('btnScene'), t = scene === 'garden' ? 'เข้าบ้าน' : 'ไปสวน'; b.textContent = t; b.setAttribute('aria-label', t); }
+  function goScene(to) {
+    if (sw || to === scene) return;
+    A.blip(); UI.closeSheet(); stopTool(true); hideHint();
+    sw = { t: 0, to: to, done: false };
+  }
+  function applyScene(to) { scene = to; R.setScene(to); sceneLabel(); Cat.fit(); }
+  function updateFade(dt) {
+    sw.t += dt;
+    if (!sw.done && sw.t >= 0.175) { sw.done = true; applyScene(sw.to); }
+    if (sw.t >= 0.35) sw = null;
+  }
+
   /* ---------- buttons ---------- */
   function wireButtons() {
     var ic = [['bTreat', 'fish', 2], ['bPlay', 'feather', 2], ['bDress', 'crown', 2], ['bMem', 'photo', 2]];
@@ -422,6 +439,8 @@
     $('bPlay').addEventListener('click', function () { A.blip(); openPlay(); });
     $('bDress').addEventListener('click', function () { A.blip(); openDress(); });
     $('bMem').addEventListener('click', function () { A.blip(); openMem(0); });
+    $('btnScene').addEventListener('click', function () { goScene(scene === 'garden' ? 'house' : 'garden'); });
+    sceneLabel();
     $('btnSound').addEventListener('click', toggleSound); $('btnMenu').addEventListener('click', function () { A.blip(); openMenu(); });
     $('sheetClose').addEventListener('click', function () { UI.closeSheet(); }); $('scrim').addEventListener('click', function () { UI.closeSheet(); });
     soundIcon(); showHearts();
@@ -455,6 +474,7 @@
       hour = new Date().getHours();
       if (np !== phase) { prevPhase = phase; phase = np; fadeT = 0; Cat.setPhase(phase, hour); }
     }
+    if (sw) updateFade(dt);
     if (fadeT < 1) { fadeT = Math.min(1, fadeT + dt / 2); if (fadeT >= 1) prevPhase = null; }
     Cat.update(dt);
     if (tool === 'wand' && wand) updateWand(dt);
@@ -472,12 +492,14 @@
     }
   }
   function draw() {
-    var ctx = vx, ph = R.PH[phase], pp = prevPhase ? R.PH[prevPhase] : null;
+    var ctx = vx, ph = R.PH[phase], pp = prevPhase ? R.PH[prevPhase] : null, gd = scene === 'garden';
     R.drawBg(ctx, phase, prevPhase, fadeT);
-    R.drawBed(ctx);
-    var beam = pp ? pp.beam + (ph.beam - pp.beam) * fadeT : ph.beam;
-    R.drawBeam(ctx, hour, beam);
-    var list = [{ y: 104, f: function () { R.drawFan(ctx, ph.fan, tAll); } }, { y: 146.5 + R.D(), f: function () { R.drawBowls(ctx, food); } }];
+    if (!gd) { // the bed, fan and sun beam belong to the house; the bowls are in both scenes
+      R.drawBed(ctx);
+      R.drawBeam(ctx, hour, pp ? pp.beam + (ph.beam - pp.beam) * fadeT : ph.beam);
+    }
+    var list = [{ y: 146.5 + R.D(), f: function () { R.drawBowls(ctx, food); } }];
+    if (!gd) list.push({ y: 104, f: function () { R.drawFan(ctx, ph.fan, tAll); } });
     var inBox = box && box.in && Cat.pose() === 'inBox';
     if (!inBox) list.push({ y: Cat.y, f: function () { Cat.draw(ctx); } });
     if (box) list.push({ y: box.y, f: function () {
@@ -486,11 +508,12 @@
     } });
     list.sort(function (a, b) { return a.y - b.y; });
     for (var i = 0; i < list.length; i++) list[i].f();
-    R.drawBedFront(ctx);
+    if (!gd) R.drawBedFront(ctx);
     R.drawOverlay(ctx, phase, prevPhase, fadeT);
-    if (phase === 'night') R.drawStars(ctx, tAll, state.messages);
+    if (phase === 'night') R.drawStars(ctx, tAll, state.messages, R.skyRect());
     Fx.draw(ctx);
     if (tool === 'wand' && wand) drawWand(ctx);
+    if (sw) { ctx.globalAlpha = sw.t < 0.175 ? sw.t / 0.175 : Math.max(0, 1 - (sw.t - 0.175) / 0.175); ctx.fillStyle = '#1A2B47'; ctx.fillRect(0, 0, 128, VH); ctx.globalAlpha = 1; }
     sctx.drawImage(vc, 0, 0, canvas.width, canvas.height);
     UI.place(); placeHint();
   }
@@ -548,5 +571,5 @@
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(resize);
   applyDemo();
   requestAnimationFrame(frame);
-  window.__som = { tick: function (sec) { for (var t = 0; t < sec; t += 0.033) update(0.033); }, state: state, Cat: Cat, R: R, giveHearts: giveHearts, setPhase: function (p) { prevPhase = phase; phase = p; hour = HOURS[p]; fadeT = 0; Cat.reset(p, hour); } };
+  window.__som = { goScene: goScene, scene: function () { return scene; }, tick: function (sec) { for (var t = 0; t < sec; t += 0.033) update(0.033); }, state: state, Cat: Cat, R: R, giveHearts: giveHearts, setPhase: function (p) { prevPhase = phase; phase = p; hour = HOURS[p]; fadeT = 0; Cat.reset(p, hour); } };
 })();

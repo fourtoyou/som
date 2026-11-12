@@ -39,6 +39,7 @@ button{font:inherit;color:inherit;border:0;background:none;margin:0;padding:0;to
 @keyframes bump{50%{transform:scale(1.15)}}
 .sp{flex:1}
 .tbtn{width:56px;height:56px;min-height:56px;padding:0}
+.tbtn.txt{width:auto;padding:0 10px;font-size:18px;white-space:nowrap}
 .bars{display:grid;gap:5px;width:24px}.bars i{display:block;height:4px;background:var(--ink)}
 /* stage */
 #stage{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;background:var(--navy);position:relative}
@@ -129,6 +130,7 @@ body.title #top,body.title #bottom{visibility:hidden}
   <header id="top">
     <div id="hearts"><img id="heartIc" alt=""><span id="heartN">0</span></div>
     <div class="sp"></div>
+    <button class="btn paper tbtn txt" id="btnScene">ไปสวน</button>
     <button class="btn paper tbtn" id="btnSound" aria-label="เสียง"></button>
     <button class="btn paper tbtn" id="btnMenu" aria-label="เมนู"><span class="bars"><i></i><i></i><i></i></span></button>
   </header>
