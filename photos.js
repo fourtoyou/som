@@ -2198,5 +2198,61 @@ window.SOM_PHOTOS = [
   "w": 473,
   "h": 960,
   "caption": "หลับยาวบนพื้นหน้าชั้นทีวี"
+ },
+ {
+  "id": "276",
+  "src": "photos/276.jpg",
+  "thumb": "photos/thumbs/276.jpg",
+  "w": 960,
+  "h": 596,
+  "caption": "หนุ่มหล่อปี 2017 นอนเอกเขนกมองไกล"
+ },
+ {
+  "id": "277",
+  "src": "photos/277.jpg",
+  "thumb": "photos/thumbs/277.jpg",
+  "w": 960,
+  "h": 615,
+  "caption": "หมอบนิ่ง ตาเหลืองใสแจ๋ว"
+ },
+ {
+  "id": "278",
+  "src": "photos/278.jpg",
+  "thumb": "photos/thumbs/278.jpg",
+  "w": 960,
+  "h": 579,
+  "caption": "นอนแผ่ แก้มแนบพื้น เหลือบตามองกล้อง"
+ },
+ {
+  "id": "279",
+  "src": "photos/279.jpg",
+  "thumb": "photos/thumbs/279.jpg",
+  "w": 960,
+  "h": 579,
+  "caption": "นอนโชว์อุ้งเท้าชมพู หน้าขรึม ๆ"
+ },
+ {
+  "id": "280",
+  "src": "photos/280.jpg",
+  "thumb": "photos/thumbs/280.jpg",
+  "w": 960,
+  "h": 617,
+  "caption": "นั่งในทุ่งหญ้า เท่เหมือนนายแบบ"
+ },
+ {
+  "id": "281",
+  "src": "photos/281.jpg",
+  "thumb": "photos/thumbs/281.jpg",
+  "w": 767,
+  "h": 960,
+  "caption": "ห้อยกระดิ่ง ทำหน้าบึ้งใส่กล้อง"
+ },
+ {
+  "id": "282",
+  "src": "photos/282.jpg",
+  "thumb": "photos/thumbs/282.jpg",
+  "w": 960,
+  "h": 640,
+  "caption": "นอนเฝ้าศาล มองกล้องนิ่ง ๆ"
  }
 ];
