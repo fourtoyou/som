@@ -239,15 +239,15 @@
   }
 
   /* ---------- dress-up ---------- */
-  function applyAcc() { Cat.acc = { head: state.equipped.head }; }
+  function applyAcc() { Cat.acc = { head: state.equipped.head, neck: state.equipped.neck }; }
   function openDress() {
     var body = el('div'), g = el('div', 'grid');
     function build() {
       g.textContent = '';
       S.ITEMS.forEach(function (it) {
-        var on = state.equipped.head === it.id, b = el('button', 'btn item' + (on ? ' sel' : '')); b.appendChild(UI.icon(it.id, 5)); b.appendChild(el('span', null, it.name));
+        var on = state.equipped[it.slot] === it.id, b = el('button', 'btn item' + (on ? ' sel' : '')); b.appendChild(UI.icon(it.id, 5)); b.appendChild(el('span', null, it.name));
         if (on) b.appendChild(el('span', null, 'ใส่อยู่'));
-        b.addEventListener('click', function () { S.equip(state, it.id); applyAcc(); dirty(); A.sparkle(); var r = Cat.rects(); Fx.sparkle(r.head.x + r.head.w / 2, r.head.y); build(); });
+        b.addEventListener('click', function () { S.equip(state, it.id); applyAcc(); dirty(); A.sparkle(); var r = Cat.rects(); Fx.sparkle(r.head.x + r.head.w / 2, it.slot === 'neck' ? r.head.y + r.head.h : r.head.y); build(); });
         g.appendChild(b);
       });
     }
@@ -544,7 +544,7 @@
 
   /* ---------- boot ---------- */
   wireButtons(); resize();
-  Cat.acc = { head: state.equipped.head }; Cat.reset(phase, hour);
+  applyAcc(); Cat.reset(phase, hour);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(resize);
   applyDemo();
   requestAnimationFrame(frame);

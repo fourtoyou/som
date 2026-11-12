@@ -10,7 +10,7 @@
   function pick(w) { var r = Math.random(), s = 0; for (var i = 0; i < w.length; i++) { s += w[i][0]; if (r < s) return w[i][1]; } return w[w.length - 1][1]; }
 
   var Cat = {
-    x: 62, y: 128, dir: 1, lift: 0, time: 0, phase: 'day', hour: 12, acc: { head: null },
+    x: 62, y: 128, dir: 1, lift: 0, time: 0, phase: 'day', hour: 12, acc: { head: null, neck: null },
     steps: [], step: null, st: 0, ov: null, petT: 0, wakeAt: [], awakeUntil: 0, busy: false,
     nextBlink: 2, blinkUntil: 0, nextEar: 6, earUntil: 0, nextTw: 3, twUntil: 0, nextZ: 1, nextSlow: 20, slowUntil: 0, nextDrowsy: 30, drowsyUntil: 0, nextPaw: 4, pawUntil: 0,
     onBubble: null

@@ -4,7 +4,8 @@
 
   var ITEMS = [
     { id: 'crown',   slot: 'head', name: 'มงกุฎราชา' },
-    { id: 'sticker', slot: 'head', name: 'สติกเกอร์หน้าผาก' }
+    { id: 'sticker', slot: 'head', name: 'สติกเกอร์หน้าผาก' },
+    { id: 'bell',    slot: 'neck', name: 'ปลอกคอกระดิ่ง' }
   ];
   var TREATS = [
     { id: 'rice',    name: 'ข้าวเม็ด',     say: 'ง่ำๆ อร่อย!' },
@@ -49,7 +50,7 @@
     var t = now || Date.now();
     return {
       v: 1, name: '', createdAt: t, lastSeen: t, hearts: 0, petsTotal: 0, treatsTotal: 0,
-      fullness: { n: 0, at: t }, equipped: { head: null },
+      fullness: { n: 0, at: t }, equipped: { head: null, neck: null },
       motd: { date: '' }, messages: [], bestCatch: 0, hints: { pet: false, slowblink: false }, sound: true
     };
   }
@@ -68,8 +69,10 @@
         d.fullness = { n: Math.min(FULL_AT, num(o.fullness.n, 0, 0)), at: num(o.fullness.at, d.fullness.at, 0) };
       }
       if (o.equipped && typeof o.equipped === 'object') {
-        var it = ITEMS.filter(function (i) { return i.id === o.equipped.head && i.slot === 'head'; })[0];
-        d.equipped.head = it ? it.id : null;
+        Object.keys(d.equipped).forEach(function (slot) {
+          var it = ITEMS.filter(function (i) { return i.id === o.equipped[slot] && i.slot === slot; })[0];
+          d.equipped[slot] = it ? it.id : null;
+        });
       }
       if (o.motd && typeof o.motd === 'object') d.motd.date = str(o.motd.date, '', 10);
       if (Array.isArray(o.messages)) {
@@ -92,7 +95,7 @@
   }
 
   function addHearts(s, n) { s.hearts += Math.max(0, Math.floor(n)); }
-  // one head item at a time; tapping the worn item removes it
+  // one item per slot (head, neck); tapping the worn item removes it
   function equip(s, id) {
     var it = ITEMS.filter(function (i) { return i.id === id; })[0];
     if (!it) return false;

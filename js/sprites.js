@@ -6,7 +6,9 @@
     '#7C462C', '#D47C38', '#F0A358', '#FACC92', '#FFF9EE', '#ECDCC8', '#F4969E', '#F5CC48', '#302822', '#7A4A34',
     '#FFF1E6', '#F0D6C8', '#FAACA4', '#FFFFFF', '#E8924E', '#FCC6C6', '#FFF0A0', '#B07652', '#603824',
     '#F2C14E', '#C98F1E', '#FFE69A', '#D8324B', '#2FAE6A', '#3C63C8', '#E03B4F', '#A82237', '#FF8A1F', '#FFC060',
-    '#D9444F', '#FFFFFF', '#2FA39E', '#1F7C78', '#1E242B', '#3A4656', '#FFFFFF', '#C9955A', '#A4733F', '#DDB27A', '#EAD0A0'];
+    '#D9444F', '#FFFFFF', '#2FA39E', '#1F7C78', '#1E242B', '#3A4656', '#FFFFFF', '#C9955A', '#A4733F', '#DDB27A', '#EAD0A0',
+    '#BE9272', '#CBD2DC', '#FAFCFF', '#3C4352', '#D8454F', '#A02F3C', '#9AA3B4', '#6A7285', '#2A9D8F', '#6CCFC0', '#1D6F68'];
+  var CORD = 41, SIL = 42, SILH = 43, SLIT = 44, SILS = 47, BOUT = 48, TAG = 49, TAGH = 50, TAGD = 51; // BOUT = bell outline; 45/46 (red band) unused
   var OUT = 1, STR = 2, FUR = 3, FURL = 4, WHT = 5, WSH = 6, PNK = 7, GRN = 8, EYE = 9, FRK = 10, BEL = 11, BEL2 = 12, BLU = 13, HI = 14, SHD = 15, PNKL = 16, IRL = 17, OUTS = 18, MTH = 19;
 
   /* ---------- Buf (tx/ty = drawing origin shift; blit/finish ignore it) ---------- */
@@ -197,6 +199,16 @@
     if (!acc) return;
     if (acc.head === 'sticker') drawSticker(out, ox + 19, oy + 8);
     if (acc.head === 'crown') out.blit(ACC.crown(), ox + 14 + out.tx - 1, oy - 2 + out.ty - 1);
+    if (acc.neck === 'bell') drawNeck(out, ox, oy, acc.boxed);
+  }
+  // thin muted cord + silver jingle bell + teal name tag (2017 photo). Chin bottom row is oy+26 (x ox+16..27); bell hangs just under it, centred on the face midline (x 21|22).
+  function drawNeck(out, ox, oy, boxed) {
+    var x, v;
+    function onHead(px, py) { v = out.g(px, py); return v && v !== OUT && v !== OUTS; }
+    for (x = ox + 15; x <= ox + 28; x++) if (onHead(x, oy + 26)) out.s(x, oy + 26, CORD);
+    if (boxed) return; // the box front hides the bell anyway; a 2px stub would look like a stray blob
+    out.stamp(['LLL', 'TTT', 'TTT', 'DDD'], ox + 25, oy + 27, { L: TAGH, T: TAG, D: TAGD }); // touches the bell's right side
+    out.stamp(['.oooo.', 'oHHSso', 'oHSSso', 'oddddo', 'oSSsso', '.oooo.'], ox + 19, oy + 26, { o: BOUT, H: SILH, S: SIL, s: SILS, d: SLIT });
   }
 
   /* ---------- pose canvas: layers share one frame; out.tx/ty map frame coords onto the padded output ---------- */
@@ -435,6 +447,7 @@
     P.layer(function (b) { tailDraw(b, [[49, 33], [47, 39.5], [40, 42], [33, 41.5], [28 + tw, 39.5]], 1.9); });
     P.head(hx, hy, { expr: 'sleep', ear: o.ear, acc: o.acc, pose: 'curl' });
     bean(P, 14, G - 1.2, 3.4, 2); bean(P, 23, G - 1.2, 3.4, 2);
+    if (o.acc && o.acc.neck === 'bell') drawNeck(P.out, hx, hy);
     return P.res(27, G, hx, hy);
   }
 
@@ -444,7 +457,7 @@
     P.layer(function (b) { b.rect(C - 19, P0 - 6, 39, 8, 38); b.rect(C - 19, P0 - 6, 39, 1, 39); });
     var hy = P0 - 1 - rows;
     if (vis) {
-      P.head(C - 22, hy, { expr: o.expr, ear: o.ear, acc: o.acc, pose: 'inBox' });
+      P.head(C - 22, hy, { expr: o.expr, ear: o.ear, acc: o.acc && { head: o.acc.head, neck: o.acc.neck, boxed: true }, pose: 'inBox' });
       if (rows > 20) { bean(P, C - 13, P0 - 1, 3.4, 2.2); bean(P, C + 13, P0 - 1, 3.4, 2.2); }
     }
     P.layer(function (b) {
@@ -495,7 +508,7 @@
   }
 
   var cache = {};
-  function accKey(a) { return (a && a.head) || '-'; }
+  function accKey(a) { return ((a && a.head) || '-') + '/' + ((a && a.neck) || '-'); }
   function get(spec) {
     var key = [spec.pose, spec.f || 0, spec.expr || 'open', spec.br ? 1 : 0, spec.tw || 0, spec.ear ? 1 : 0, spec.mo ? 1 : 0,
       spec.chew ? 1 : 0, spec.rump || 0, spec.wg || 0, spec.hug ? 1 : 0, spec.pt || 0, spec.vis || 0, accKey(spec.acc)].join('|');
@@ -514,6 +527,13 @@
   function accIcon(id) {
     var buf = ACC[id] ? ACC[id]() : null;
     if (id === 'sticker') { buf = new Buf(10, 10); buf.ell(4.5, 4.5, 4, 4, 28); buf.s(2, 2, 29); buf.s(3, 2, 29); buf.s(2, 3, 29); buf = finish(buf); }
+    if (id === 'bell') { // short piece of cord, the bell and the tag
+      buf = new Buf(12, 8);
+      for (var x = 0; x < 12; x++) buf.s(x, 1, CORD); // same row as the bell's top, as on the cat
+      buf.stamp(['LLL', 'TTT', 'TTT', 'DDD'], 8, 2, { L: TAGH, T: TAG, D: TAGD });
+      buf.stamp(['.oooo.', 'oHHSso', 'oHSSso', 'oddddo', 'oSSsso', '.oooo.'], 2, 1, { o: BOUT, H: SILH, S: SIL, s: SILS, d: SLIT });
+      buf = finish(buf);
+    }
     return buf ? toCanvas(buf).cv : null;
   }
 
