@@ -5,6 +5,7 @@
   var Q = new URLSearchParams(location.search), DEMO = Q.get('demo') || '', DEBUG = Q.get('debug') === '1', PQ = Q.get('phase');
   var HOURS = { dawn: 6, morning: 9, day: 13, evening: 17, night: 22 };
   if (PQ && !HOURS[PQ]) PQ = null;
+  if (!PQ && Q.get('night') === '1') PQ = 'night'; else if (!PQ && Q.get('night') === '0') PQ = 'day'; // test override
 
   /* ---------- storage (silent failures) ---------- */
   var store = {

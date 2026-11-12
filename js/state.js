@@ -29,9 +29,9 @@
   function localDayNumber(d) { return Math.floor((d.getTime() - d.getTimezoneOffset() * 60000) / 86400000); }
   function memoryIndex(d, len) { return len > 0 ? localDayNumber(d) % len : -1; }
 
-  // dawn 05-06, morning 07-10, day 11-16, evening 17-18, night 19-04
+  // dawn 06, morning 07-10, day 11-16, evening 17-18, night 19-05
   function phaseFor(hour) {
-    if (hour >= 5 && hour < 7) return 'dawn';
+    if (hour >= 6 && hour < 7) return 'dawn';
     if (hour >= 7 && hour < 11) return 'morning';
     if (hour >= 11 && hour < 17) return 'day';
     if (hour >= 17 && hour < 19) return 'evening';

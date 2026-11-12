@@ -13,7 +13,7 @@
   };
   var ORDER = ['dawn', 'morning', 'day', 'evening', 'night'];
   var LAMP = { x: 66, y: 22 }, BEDC = { x: 31, y: 135 };
-  var ROWS = 7;
+  var ROWS = 7, NSTARS = [], shoot = null, nextShoot = 12;
 
   function mk(w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
   function hex(h) { return [parseInt(h.substr(1, 2), 16), parseInt(h.substr(3, 2), 16), parseInt(h.substr(5, 2), 16)]; }
@@ -64,11 +64,15 @@
   function windowLayer(c, ph, night) {
     var p = PH[ph], y, k;
     R(c, '#F2F6F4', 8, 8, 43, 37);
-    for (y = 10; y < 43; y++) R(c, lerpHex(p.skyA, p.skyB, (y - 10) / 32), 10, y, 39, 1);
-    if (night) {
-      rng = 99;
-      for (k = 0; k < 14; k++) R(c, '#DCE6FF', 11 + Math.floor(rnd() * 37), 11 + Math.floor(rnd() * 30), 1, 1);
-    }
+    if (night) { // Bayer-dithered deep blue-purple sky + ; moon + stars are drawn live above the dimming (twinkle)
+      var B = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5], x, t, u;
+      for (y = 10; y < 43; y++) for (x = 10; x < 49; x++) {
+        t = (y - 10) / 32 * 1.3 - 0.15 + ((B[(y & 3) * 4 + (x & 3)] + 0.5) / 16 - 0.5) * 0.5;
+        R(c, t > 0.5 ? '#2A2F72' : t > 0.15 ? '#1E2360' : '#141A4A', x, y, 1, 1);
+      }
+      rng = 99; NSTARS = [];
+      for (k = 0; k < 14; k++) NSTARS.push([11 + Math.floor(rnd() * 37), 11 + Math.floor(rnd() * 30)]);
+    } else for (y = 10; y < 43; y++) R(c, lerpHex(p.skyA, p.skyB, (y - 10) / 32), 10, y, 39, 1);
     for (k = 0; k < 6; k++) { R(c, p.line, 10, 14 + k * 5, 39, 1); R(c, p.glint, 10, 10 + k * 5, 39, 1); }
     R(c, '#CBD6D2', 8, 8, 43, 1); R(c, '#CBD6D2', 8, 8, 2, 37); R(c, '#D9E2DE', 49, 8, 2, 37);
     R(c, '#E4ECE9', 6, 44, 47, 2); R(c, '#BFD0CB', 6, 46, 47, 1);
@@ -208,6 +212,23 @@
       else ctx.drawImage(overlayFor(ph), 0, 0);
     },
     drawStars: function (ctx, time, msgs) { // message stars + the orange star (night)
+      var j, tw, sx, sy;
+      R(ctx, '#F4EBC8', 15, 16, 5, 5); R(ctx, '#F4EBC8', 14, 17, 7, 3); R(ctx, '#F4EBC8', 16, 15, 3, 7);
+      R(ctx, '#D9CFA0', 18, 18, 2, 2); R(ctx, '#1E2360', 18, 15, 3, 2); R(ctx, '#1E2360', 19, 17, 2, 1); // crescent bite
+      for (j = 0; j < NSTARS.length; j++) { // slow twinkle, a few blink out
+        tw = (time * 0.5 + j * 0.37) % 4;
+        if (j < 5 && tw > 3.3) continue;
+        ctx.fillStyle = j < 5 && tw > 2.9 ? '#6F7BB8' : '#DCE6FF'; ctx.fillRect(NSTARS[j][0], NSTARS[j][1], 1, 1);
+      }
+      if (!shoot && time > nextShoot) { shoot = { t0: time, x: 40 + Math.random() * 6, y: 12 + Math.random() * 8 }; nextShoot = time + 20 + Math.random() * 20; }
+      if (shoot) { // diagonal streak inside the window glass
+        var u = (time - shoot.t0) / 0.9;
+        if (u >= 1) shoot = null;
+        else for (j = 0; j < 5; j++) {
+          sx = Math.round(shoot.x - (u * 18 - j)); sy = Math.round(shoot.y + (u * 9 - j / 2));
+          if (sx > 10 && sx < 48 && sy > 10 && sy < 42) { ctx.fillStyle = j ? 'rgba(220,230,255,' + (0.7 - j * 0.14) + ')' : '#FFFFFF'; ctx.fillRect(sx, sy, 1, 1); }
+        }
+      }
       var tw = Math.floor(time * 2) % 2, i, n = Math.min(msgs ? msgs.length : 0, 60);
       for (i = 0; i < n; i++) {
         var p = root.SomState.starPos(msgs[i].id), on = (Math.floor(time * 1.3 + i * 0.7) % 3) === 0;
