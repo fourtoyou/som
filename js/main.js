@@ -19,6 +19,7 @@
   function dirty() { if (!saveT) saveT = setTimeout(save, 1000); }
   document.addEventListener('visibilitychange', function () { if (document.hidden) { save(); A.purr(false); } });
   window.addEventListener('pagehide', save);
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {} // ask the browser not to evict saved letters
 
   R.setScene(scene);
 
@@ -376,6 +377,34 @@
       ta.value = ''; dirty(); A.sparkle(); render();
     });
     render();
+
+    // backup: letters live only in this browser, so let people keep a copy and bring it back
+    var bk = el('div', 'panel backup');
+    bk.appendChild(el('b', null, 'เก็บสำรองข้อความ'));
+    bk.appendChild(el('div', 'bnote', 'ข้อความถึงส้มเก็บไว้ในเครื่องนี้เท่านั้น เก็บไฟล์สำรองไว้กันหาย หรือเอาไปใส่ในเครื่องอื่นได้'));
+    var out = el('button', 'btn wide paper', 'บันทึกไฟล์สำรอง'), inn = el('button', 'btn wide paper', 'นำข้อความกลับมาจากไฟล์');
+    var fi = el('input', null, null, { type: 'file', accept: 'application/json,.json', hidden: '' }), res = el('div', 'bnote');
+    bk.appendChild(out); bk.appendChild(inn); bk.appendChild(fi); bk.appendChild(res); body.appendChild(bk);
+    out.addEventListener('click', function () {
+      A.blip(); save();
+      var blob = new Blob([S.exportBackup(state, Date.now())], { type: 'application/json' }), a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = 'som-backup-' + S.dateKey(new Date()) + '.json';
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+      res.textContent = 'บันทึกไฟล์แล้ว (' + state.messages.length + ' ข้อความ)';
+    });
+    inn.addEventListener('click', function () { A.blip(); fi.click(); });
+    fi.addEventListener('change', function () {
+      var f = fi.files && fi.files[0]; if (!f) return;
+      var r = new FileReader();
+      r.onload = function () {
+        var m = S.mergeBackup(state, String(r.result), Date.now());
+        fi.value = '';
+        if (!m.ok) { res.textContent = 'ไฟล์นี้ไม่ใช่ไฟล์สำรองของส้ม'; return; }
+        dirty(); save(); render(); res.textContent = m.added ? 'นำกลับมา ' + m.added + ' ข้อความ' : 'ข้อความทั้งหมดมีอยู่แล้ว';
+      };
+      r.onerror = function () { res.textContent = 'อ่านไฟล์ไม่ได้'; };
+      r.readAsText(f);
+    });
   }
 
   function tabProfile(body) {

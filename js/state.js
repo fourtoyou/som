@@ -142,6 +142,25 @@
     return { x: x, y: y };
   }
 
+  // Backup: the whole state as JSON text. mergeBackup adds only what is missing (letters by id) and never lowers counters.
+  function exportBackup(s, now) {
+    return JSON.stringify({ app: 'somhouse', exportedAt: now, data: s }, null, 1);
+  }
+  function mergeBackup(s, json, now) {
+    var o = null;
+    try { o = JSON.parse(json); } catch (e) { return { ok: false, added: 0 }; }
+    if (!o || o.app !== 'somhouse' || !o.data || typeof o.data !== 'object') return { ok: false, added: 0 };
+    var b = repair(o.data, now), have = {}, added = 0;
+    s.messages.forEach(function (m) { have[m.id] = true; });
+    b.messages.forEach(function (m) { if (!have[m.id]) { s.messages.push(m); have[m.id] = true; added++; } });
+    s.messages.sort(function (x, y) { return x.at - y.at; });
+    if (s.messages.length > 500) s.messages = s.messages.slice(-500);
+    s.hearts = Math.max(s.hearts, b.hearts); s.petsTotal = Math.max(s.petsTotal, b.petsTotal);
+    s.treatsTotal = Math.max(s.treatsTotal, b.treatsTotal); s.bestCatch = Math.max(s.bestCatch, b.bestCatch);
+    if (!s.name && b.name) s.name = b.name;
+    return { ok: true, added: added };
+  }
+
   function needMotd(s, now) { return s.motd.date !== dateKey(new Date(now)); }
   function markMotd(s, now) { s.motd.date = dateKey(new Date(now)); }
 
@@ -150,7 +169,7 @@
     dateKey: dateKey, thaiDate: thaiDate, localDayNumber: localDayNumber, memoryIndex: memoryIndex, phaseFor: phaseFor,
     defaults: defaults, repair: repair, parse: parse, addHearts: addHearts, equip: equip,
     fullnessNow: fullnessNow, isFull: isFull, feed: feed, needMotd: needMotd, markMotd: markMotd,
-    addMessage: addMessage, deleteMessage: deleteMessage, starPos: starPos
+    addMessage: addMessage, deleteMessage: deleteMessage, exportBackup: exportBackup, mergeBackup: mergeBackup, starPos: starPos
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SomState = api;

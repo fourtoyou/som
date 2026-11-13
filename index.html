@@ -115,6 +115,7 @@ body.title #top,body.title #bottom{visibility:hidden}
 @keyframes tw{50%{opacity:.7}}
 #msgIn{display:block;width:calc(100% - 6px);margin:3px;min-height:120px;padding:12px;font:500 20px/1.4 var(--font);color:var(--ink);background:#fff;border:0;box-shadow:var(--edge);resize:none;-webkit-user-select:text;user-select:text}
 .letters{margin-top:16px;display:grid;gap:14px}
+.backup{margin-top:18px;padding:14px}.backup .bnote{font-size:16px;margin:6px 0 10px;line-height:1.4}.backup .btn{margin-bottom:6px}
 .letter .meta{font-weight:700;font-size:18px;color:var(--som-deep);margin-bottom:6px}
 .letter .txt{white-space:pre-wrap;word-break:break-word;font-size:20px;line-height:1.45}
 .letter .row{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:8px;flex-wrap:wrap}
@@ -198,5 +199,6 @@ body.title #top,body.title #bottom{visibility:hidden}
 <script src="js/cat.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>
+<script>if ("serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js").catch(function () {});</script>
 </body>
 </html>
