@@ -81,7 +81,7 @@
   function placeHint() { if (!hintOn) return; var p = Cat.headTop(); var h = $('hint'); h.style.left = (p.x * cssScale) + 'px'; h.style.top = (p.y * cssScale + 9 * cssScale) + 'px'; }
 
   /* ---------- pointer: petting / toys ---------- */
-  var tool = null, pet = null, wand = null, box = null, food = null;
+  var tool = null, pet = null, wand = null, box = null, ball = null, food = null;
   function toV(e) { var r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * 128, y: (e.clientY - r.top) / r.height * VH }; }
   var lastVib = 0;
 
@@ -90,6 +90,7 @@
     e.preventDefault(); try { canvas.setPointerCapture(e.pointerId); } catch (x) {}
     var v = toV(e);
     if (tool === 'wand') { wand.down = true; moveWand(v, true); return; }
+    if (tool === 'ball' && ball && !Cat.hit(v.x, v.y)) { ballKick(v); return; }
     if (tool === 'box' && box && boxHit(v) && !Cat.hit(v.x, v.y)) { stowBox(); return; }
     var zone = Cat.hit(v.x, v.y);
     if (!zone && phase === 'night' && !tool && v.x >= R.STAR.x - 3 && v.x <= R.STAR.x + R.STAR.w + 3 && v.y >= R.STAR.y - 3 && v.y <= R.STAR.y + R.STAR.h + 3) { A.sparkle(); openMem(1); return; }
@@ -168,9 +169,9 @@
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
   function openPlay() {
     var body = el('div'), g = el('div', 'grid');
-    [['wand', 'feather', 'ไม้ตกแมว'], ['box', 'box', 'กล่องกระดาษ']].forEach(function (it) {
+    [['wand', 'feather', 'ไม้ตกแมว'], ['box', 'box', 'กล่องกระดาษ'], ['ball', 'ball', 'ลูกบอลแดง']].forEach(function (it) {
       var b = el('button', 'btn item'); if (it[1] === 'box') { var c = document.createElement('canvas'); var m = SP.get({ pose: 'inBox', vis: 0 }); c.width = m.w; c.height = m.h; c.getContext('2d').drawImage(m.cv, 0, 0); var im = el('img', 'ic'); var k = document.createElement('canvas'); k.width = m.w * 2; k.height = m.h * 2; var kx = k.getContext('2d'); kx.imageSmoothingEnabled = false; kx.drawImage(c, 0, 0, k.width, k.height); im.src = k.toDataURL(); b.appendChild(im); }
-      else b.appendChild(UI.icon(it[1], 2));
+      else b.appendChild(UI.icon(it[1], it[1] === 'ball' ? 4 : 2));
       b.appendChild(el('span', null, it[2])); b.addEventListener('click', function () { A.blip(); UI.closeSheet(); startTool(it[0]); }); g.appendChild(b);
     });
     body.appendChild(g); UI.openSheet('เล่น', body);
@@ -179,11 +180,12 @@
   function startTool(name) {
     stopTool(true); tool = name;
     if (name === 'wand') { wand = { x: 64, y: 96 + Math.round(R.D() / 3), px: 64, py: 96, down: false, speed: 0, idle: 0, cool: 0, hover: 0, watch: false, acc: 0 }; showToybar('ลากนิ้วให้ส้มเล่น'); Cat.run([{ t: 'hold', pose: 'sit', expr: 'open', ms: Infinity }], true); }
+    else if (name === 'ball') { ball = { x: 64, y: clamp(R.SPOT.center.y + 6, R.FLOOR.y0 + 6, R.FLOOR.y1 - 4), vx: 0, vy: 0, h: 0, vh: 0, cool: 1, idle: 0, retarget: 0, kicks: 0 }; showToybar('แตะที่พื้นให้ลูกบอลกลิ้ง'); Cat.run([{ t: 'hold', pose: 'sit', expr: 'open', ms: Infinity }], true); }
     else { box = { x: 62, y: R.SPOT.center.y + 2, in: false, loops: 0 }; showToybar('แตะกล่องเพื่อเก็บ'); boxStart(); }
   }
   function stopTool(quiet) {
     if (!tool) return;
-    var was = tool; tool = null; wand = null;
+    var was = tool; tool = null; wand = null; ball = null;
     if (was === 'box' && box) { var b = box; box = null; if (b.in) Cat.x = b.x - 24, Cat.y = b.y + 6; }
     showToybar(null); Cat.busy = false; Cat.interrupt(); if (!quiet) Cat.holdNow('sit', 4000);
   }
@@ -219,6 +221,56 @@
       { t: 'call', fn: function () { giveHearts(3, Cat.x, Cat.y - 22); A.pop(); A.meow(); say(Math.random() < 0.5 ? 'จับได้!' : 'เมี้ยว!', 1300); } },
       { t: 'hold', pose: 'sit', expr: 'open', ms: 700 },
       { t: 'hold', pose: 'sit', expr: 'open', ms: Infinity }], true);
+  }
+
+  /* red ball: tap the floor to roll it that way; ส้ม chases it and bats it around on their own */
+  function ballSpeed() { return Math.hypot(ball.vx, ball.vy); }
+  function ballPush(dx, dy, sp) {
+    var n = Math.hypot(dx, dy) || 1; ball.vx = dx / n * sp; ball.vy = dy / n * sp * 0.7; ball.vh = 40 + sp * 0.5; ball.idle = 0;
+  }
+  function ballKick(v) {
+    var d = Math.hypot(v.x - ball.x, v.y - ball.y);
+    ballPush(v.x - ball.x, v.y - ball.y, clamp(d * 2.2, 30, 110)); A.blip(); ball.cool = Math.max(ball.cool, 0.4);
+  }
+  function updateBall(dt) {
+    var b = ball, F = R.FLOOR, k;
+    b.idle += dt; b.cool -= dt;
+    if (b.idle > 90) { stopTool(); return; }
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    if (b.x < F.x0 - 4) { b.x = F.x0 - 4; b.vx = Math.abs(b.vx) * 0.7; } else if (b.x > F.x1 + 4) { b.x = F.x1 + 4; b.vx = -Math.abs(b.vx) * 0.7; }
+    if (b.y < F.y0) { b.y = F.y0; b.vy = Math.abs(b.vy) * 0.7; } else if (b.y > F.y1) { b.y = F.y1; b.vy = -Math.abs(b.vy) * 0.7; }
+    k = Math.pow(0.3, dt); b.vx *= k; b.vy *= k; if (ballSpeed() < 2.5) { b.vx = 0; b.vy = 0; }
+    b.vh -= 260 * dt; b.h += b.vh * dt;
+    if (b.h < 0) { b.h = 0; b.vh = ballSpeed() > 12 ? -b.vh * 0.45 : 0; }
+    if (Cat.step && (Cat.step.t === 'leap' || Cat.step.t === 'call' || Cat.step.pose === 'crouch')) return;
+    var d = Math.hypot(Cat.x - b.x, (Cat.y - b.y) * 1.4);
+    if (Math.abs(b.x - Cat.x) > 4) Cat.dir = b.x > Cat.x ? 1 : -1;
+    if (d > 15) {
+      b.retarget -= dt;
+      if (b.retarget <= 0 || !Cat.isWalking()) {
+        b.retarget = 0.4;
+        Cat.run([Object.assign({ t: 'goto', speed: ballSpeed() > 10 ? 38 : 26 }, Cat.avoid(b.x - Math.sign(b.x - Cat.x) * 9, b.y + 3)), { t: 'hold', pose: 'sit', expr: 'open', ms: Infinity }], true);
+      }
+    } else if (b.cool <= 0 && b.h < 3) {
+      ballBat();
+    } else if (Cat.isWalking()) Cat.run([{ t: 'hold', pose: 'sit', expr: 'open', ms: Infinity }], true);
+  }
+  function ballBat() {
+    var b = ball, dir = Cat.dir || 1; b.cool = 1.6 + Math.random() * 0.8;
+    Cat.run([{ t: 'hold', pose: 'crouch', dir: dir, ms: 380 },
+      Object.assign({ t: 'leap', ms: 240, h: 7 }, Cat.avoid(b.x - dir * 7, b.y + 2)),
+      { t: 'call', fn: function () {
+        if (!ball) return;
+        var a = (Math.random() - 0.5) * 1.6; ballPush(Math.cos(a) * dir, Math.sin(a) * 0.9, 55 + Math.random() * 45);
+        ball.kicks++; A.pop(); giveHearts(2, Cat.x, Cat.y - 22); if (ball.kicks % 4 === 0) { A.meow(); say(rndOf(['ได้แล้ว!', 'เมี้ยว!', 'ลูกบอลของส้ม'])); }
+      } },
+      { t: 'hold', pose: 'sit', expr: 'open', ms: 350 },
+      { t: 'hold', pose: 'sit', expr: 'open', ms: Infinity }], true);
+  }
+  function drawBall(ctx) {
+    var b = ball, c = IC.canvas('ball'), x = Math.round(b.x), y = Math.round(b.y);
+    R.shadow(ctx, b.x, b.y, Math.max(6, 11 - b.h * 0.3));
+    ctx.drawImage(c, x - 5, y - 10 - Math.round(b.h));
   }
 
   function boxRect() { return { x: box.x - 17, y: box.y - 20, w: 35, h: 24 }; }
@@ -505,6 +557,7 @@
     if (fadeT < 1) { fadeT = Math.min(1, fadeT + dt / 2); if (fadeT >= 1) prevPhase = null; }
     Cat.update(dt);
     if (tool === 'wand' && wand) updateWand(dt);
+    if (tool === 'ball' && ball) updateBall(dt);
     if (box && box.in) { Cat.x = box.x; Cat.y = box.y; }
     Fx.update(dt);
     // purr + vibrate while rubbing
@@ -529,6 +582,7 @@
     if (!gd) list.push({ y: 104, f: function () { R.drawFan(ctx, ph.fan, tAll); } });
     var inBox = box && box.in && Cat.pose() === 'inBox';
     if (!inBox) list.push({ y: Cat.y, f: function () { Cat.draw(ctx); } });
+    if (ball) list.push({ y: ball.y, f: function () { drawBall(ctx); } });
     if (box) list.push({ y: box.y, f: function () {
       var m = SP.get(inBox ? { pose: 'inBox', vis: (Cat.step && Cat.step.vis) || 12, expr: Cat.petT > 0 ? 'happy' : 'half', acc: Cat.acc } : { pose: 'inBox', vis: 0 });
       R.shadow(ctx, box.x, box.y, 38); ctx.drawImage(m.cv, Math.round(box.x - m.ax), Math.round(box.y - m.ay));

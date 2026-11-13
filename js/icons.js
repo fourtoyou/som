@@ -68,6 +68,13 @@
       b.s(8, 3, 4);
     });
   };
+  DEF.ball = function () { // red ball: a lighter spot top-left, a darker rim bottom-right
+    return outlined(11, 11, [null, INK, '#E23B4B', '#FF8E96', '#A8202F', '#FFFFFF'], function (b) {
+      b.ell(5, 5, 3.6, 3.6, 2);
+      b.s(7, 7, 4); b.s(6, 8, 4); b.s(8, 6, 4); b.s(5, 8, 4); b.s(8, 5, 4);
+      b.s(3, 3, 3); b.s(4, 3, 3); b.s(3, 4, 3); b.s(3, 3, 5);
+    });
+  };
   DEF.photo = function () {
     return outlined(14, 12, [null, INK, '#FFF8EE', '#8FD3E8', '#5DA06C', '#FFD27A'], function (b) {
       b.rect(0, 0, 14, 12, 2); b.rect(2, 2, 10, 6, 3); b.poly([[2, 7], [5, 4], [8, 7], [10, 5], [12, 7], [12, 7], [2, 7]], 4);
