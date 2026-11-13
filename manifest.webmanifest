@@ -1,6 +1,10 @@
 {
   "name": "บ้านของส้ม",
   "short_name": "ส้ม",
+  "id": "./",
+  "scope": "./",
+  "lang": "th",
+  "description": "บ้านของส้ม ด้วยรักและคิดถึงเสมอ",
   "display": "standalone",
   "orientation": "portrait",
   "start_url": "./index.html",
