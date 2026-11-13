@@ -111,10 +111,12 @@
   function isFull(s, now) { return fullnessNow(s, now) >= FULL_AT; }
   function feed(s, now) {
     var cur = fullnessNow(s, now);
-    if (cur >= FULL_AT) return { ok: false, fullness: cur, nowFull: true };
-    s.fullness = { n: cur + 1, at: now };
+    // Treats never run out: feeding is always allowed. Fullness is capped at FULL_AT
+    // and only triggers the "full" reaction when it first reaches it.
+    var next = Math.min(FULL_AT, cur + 1);
+    s.fullness = { n: next, at: now };
     s.treatsTotal += 1;
-    return { ok: true, fullness: cur + 1, nowFull: cur + 1 >= FULL_AT };
+    return { ok: true, fullness: next, nowFull: cur < FULL_AT && next >= FULL_AT };
   }
 
   // messages to ส้ม (stored oldest first; the UI shows newest first)

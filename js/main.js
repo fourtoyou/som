@@ -143,7 +143,6 @@
   function busyScript() { return Cat.busy; }
   function giveTreat(tr) {
     var now = Date.now();
-    if (S.isFull(state, now)) return;
     UI.closeSheet(); stopTool(true);
     var fr = S.feed(state, now); dirty();
     food = tr.id === 'rice' ? 'rice' : tr.id === 'fish' ? 'fish' : tr.id === 'chicken' ? 'chicken' : 'lick';
@@ -156,11 +155,10 @@
     say('ง่ำ…', 1300);
   }
   function openTreats() {
-    var body = el('div'), full = S.isFull(state, Date.now()), g = el('div', 'grid');
-    if (full) body.appendChild(el('div', 'note', 'ส้มอิ่มแล้ว เดี๋ยวค่อยให้ใหม่นะ'));
+    var body = el('div'), g = el('div', 'grid');
     S.TREATS.forEach(function (tr) {
       var b = el('button', 'btn item'); b.appendChild(UI.icon(tr.id === 'rice' ? 'rice' : tr.id === 'fish' ? 'fish' : tr.id === 'chicken' ? 'chicken' : 'lick', 4)); b.appendChild(el('span', null, tr.name));
-      if (full) b.disabled = true; b.addEventListener('click', function () { A.blip(); giveTreat(tr); }); g.appendChild(b);
+      b.addEventListener('click', function () { A.blip(); giveTreat(tr); }); g.appendChild(b);
     });
     body.appendChild(g); UI.openSheet('ให้ขนม', body);
   }
